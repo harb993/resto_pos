@@ -1,0 +1,10 @@
+node_modules/
+out/
+dist/
+*.db
+*.db-wal
+*.db-shm
+backups/
+.env
+.DS_Store
+Thumbs.db
