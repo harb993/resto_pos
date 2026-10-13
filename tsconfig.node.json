@@ -4,8 +4,12 @@
     "composite": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "outDir": "./out/main",
+    // `npm run lint` is a type-check only. It used to emit a parallel src/ tree into
+    // ./out/main — the same directory electron-vite bundles into and package.json
+    // ships — so linting quietly added dead duplicate code to the installer.
+    "noEmit": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "types": ["node"]
   },
-  "include": ["src/main/**/*", "src/shared/**/*", "electron.vite.config.ts"]
+  "include": ["src/main/**/*", "src/preload/**/*", "src/shared/**/*", "electron.vite.config.ts"]
 }

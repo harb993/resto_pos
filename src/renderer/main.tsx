@@ -3,6 +3,10 @@ import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import './index.css'
+import { applyTheme, currentTheme } from './lib/theme'
+
+// Before the first paint, so the screen never flashes one palette and settles on another.
+applyTheme(currentTheme())
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -1,219 +1,1217 @@
-/* ===== DESIGN SYSTEM — Resto POS ===== */
+/* ===== RESTO POS — ARABIC FAST-FOOD LUXURY TOUCHSCREEN DESIGN SYSTEM ===== */
+/* No webfont @import: the till runs offline, so a remote font only ever cost a
+   render delay before falling back. See --font-family below for the system stack. */
+
 :root {
-  /* Colors — warm dark theme */
-  --bg-primary: #0f0f12;
-  --bg-secondary: #1a1a24;
-  --bg-card: #22222e;
-  --bg-card-hover: #2a2a38;
-  --bg-input: #2a2a38;
-  --bg-sidebar: #161620;
+  /* ===== COLOUR ROLES =====
+     Three jobs, three colours, never mixed — so a glance is enough to know what a
+     control does on a busy service:
+       BLUE     identity, prices, the selected thing, the main action   (--accent, --amber)
+       GREEN    completing a sale, "in stock", money in                 (--success)
+       RED      cancelling, voiding, "ran out"                          (--danger)
 
-  --text-primary: #f0f0f5;
-  --text-secondary: #9ca3b0;
-  --text-muted: #6b7280;
+     ===== THE CALM PALETTE (default) =====
+     Chosen for a screen somebody looks at for a ten-hour shift. Nothing on it is
+     fully saturated and nothing is pure white or pure black: the page is a soft
+     cool grey, the cards sit just off white, the text is slate rather than black,
+     and the one brand hue is a muted petrol blue. The original crimson-and-amber
+     palette is kept as a second theme below — see [data-theme="classic"].
 
-  --accent: #f59e0b;
-  --accent-hover: #fbbf24;
-  --accent-glow: rgba(245, 158, 11, 0.15);
-  --accent-subtle: rgba(245, 158, 11, 0.08);
+     (--amber keeps its name from that palette: it is "the primary action colour",
+     whatever hue a theme gives it.) */
 
-  --success: #22c55e;
-  --success-bg: rgba(34, 197, 94, 0.1);
-  --danger: #ef4444;
-  --danger-bg: rgba(239, 68, 68, 0.1);
-  --warning: #f59e0b;
-  --warning-bg: rgba(245, 158, 11, 0.1);
-  --info: #3b82f6;
-  --info-bg: rgba(59, 130, 246, 0.1);
+  /* Surfaces */
+  --bg-app: #EEF1F3;
+  --bg-sidebar: #26333D;
+  --bg-card: #FBFCFC;
+  --bg-card-hover: #F1F5F7;
+  --bg-card-active: #E4ECF0;
+  --bg-panel: #FBFCFC;
+  --bg-input: #FFFFFF;
+  --bg-overlay: rgba(28, 38, 46, 0.5);
 
-  --border: #2e2e3e;
-  --border-light: #3a3a4e;
+  /* Typography — slate, well above 7:1 on the cards */
+  --text-primary: #24313B;
+  --text-secondary: #54636F;
+  --text-muted: #73828E;
+  --text-light: #FFFFFF;
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
-  --shadow-glow: 0 0 20px rgba(245,158,11,0.12);
+  /* Petrol blue — identity, prices, the selected thing */
+  --accent: #2F6F8F;
+  --accent-hover: #28607C;
+  --accent-dark: #1F4D64;
+  --accent-glow: rgba(47, 111, 143, 0.16);
+  --accent-subtle: rgba(47, 111, 143, 0.08);
+  --accent-gradient: linear-gradient(135deg, #3A7C9D 0%, #2A6481 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #4489AB 0%, #30708F 100%);
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  /* The primary action: save, add */
+  --amber: #2F6F8F;
+  --amber-hover: #28607C;
+  --amber-bg: rgba(47, 111, 143, 0.12);
+  --amber-gradient: linear-gradient(135deg, #3A7C9D 0%, #2F6F8F 100%);
+  --amber-gradient-hover: linear-gradient(135deg, #4489AB 0%, #35799A 100%);
 
-  --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* Functional status colours — muted, and still 4.5:1 or better under white text */
+  --success: #2F7D5B;
+  --success-hover: #27694C;
+  --success-bg: rgba(47, 125, 91, 0.10);
+  --success-glow: rgba(47, 125, 91, 0.20);
+  --success-gradient: linear-gradient(135deg, #388B67 0%, #2F7D5B 100%);
+  --success-gradient-hover: linear-gradient(135deg, #409972 0%, #34865F 100%);
+
+  --danger: #BF4A40;
+  --danger-hover: #A53E35;
+  --danger-bg: rgba(191, 74, 64, 0.10);
+
+  --warning: #A56A1B;
+  --warning-bg: rgba(165, 106, 27, 0.12);
+
+  --info: #4A6FA5;
+  --info-bg: rgba(74, 111, 165, 0.10);
+
+  --fire: #C0622F;
+  --fire-bg: rgba(192, 98, 47, 0.12);
+
+  /* The sidebar is dark in every theme, so it has its own text and highlight */
+  --sidebar-text: #EEF3F6;
+  --sidebar-text-2: #B9C6D0;
+  --sidebar-text-3: #8A99A5;
+  --sidebar-highlight: #9CD0EA;
+  --nav-active-bg: #3A7C9D;
+  --nav-active-bg-hover: #4489AB;
+  --nav-active-edge: #9CD0EA;
+
+  /* Borders & Shadows — soft; heavy shadows read as dirt on a light UI */
+  --border: #DCE3E8;
+  --border-light: #C7D1D9;
+  --border-focus: #2F6F8F;
+
+  --shadow-sm: 0 1px 2px rgba(36, 49, 59, 0.06), 0 1px 3px rgba(36, 49, 59, 0.06);
+  --shadow-md: 0 4px 12px rgba(36, 49, 59, 0.08), 0 2px 4px rgba(36, 49, 59, 0.04);
+  --shadow-lg: 0 12px 32px rgba(36, 49, 59, 0.12), 0 4px 8px rgba(36, 49, 59, 0.06);
+  --shadow-glow: 0 0 0 3px rgba(47, 111, 143, 0.18);
+  --shadow-success-glow: 0 6px 18px rgba(47, 125, 91, 0.25);
+
+  /* Radii */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Font Families */
+  /* System-font stack — no network fetch. 'Segoe UI' covers Arabic well on Windows,
+     which is the only platform this POS ships to; the rest are cross-platform fallbacks. */
+  --font-family: 'Segoe UI', 'Cairo', 'Tajawal', 'Noto Sans Arabic', 'Dubai',
+                 -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ===== THE ORIGINAL PALETTE =====
+   Crimson for identity and selection, amber for the main action, on warm cream —
+   the colours the system shipped with, kept for anyone who prefers them. Chosen
+   from the settings screen; the choice is remembered on the machine it was made on. */
+:root[data-theme="classic"] {
+  --bg-app: #F4F1EB;
+  --bg-sidebar: #241D1C;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #FDF6EB;
+  --bg-card-active: #FAEBD7;
+  --bg-panel: #FFFFFF;
+  --bg-input: #FFFFFF;
+  --bg-overlay: rgba(30, 23, 21, 0.55);
+
+  --text-primary: #1C1614;
+  --text-secondary: #5C534E;
+  --text-muted: #8A7F79;
+
+  --accent: #C41E2E;
+  --accent-hover: #A81828;
+  --accent-dark: #8B1420;
+  --accent-glow: rgba(196, 30, 46, 0.16);
+  --accent-subtle: rgba(196, 30, 46, 0.08);
+  --accent-gradient: linear-gradient(135deg, #C41E2E 0%, #9C1522 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #D62A3A 0%, #AE1927 100%);
+
+  --amber: #DE8709;
+  --amber-hover: #C47607;
+  --amber-bg: rgba(222, 135, 9, 0.12);
+  --amber-gradient: linear-gradient(135deg, #F0A01B 0%, #DD8409 100%);
+  --amber-gradient-hover: linear-gradient(135deg, #FFB130 0%, #EE9312 100%);
+
+  --success: #15803D;
+  --success-hover: #116932;
+  --success-bg: rgba(21, 128, 61, 0.10);
+  --success-glow: rgba(21, 128, 61, 0.20);
+  --success-gradient: linear-gradient(135deg, #199247 0%, #15803D 100%);
+  --success-gradient-hover: linear-gradient(135deg, #1BA351 0%, #178C43 100%);
+
+  --danger: #D92D20;
+  --danger-hover: #B42318;
+  --danger-bg: rgba(217, 45, 32, 0.10);
+
+  --warning: #B45309;
+  --warning-bg: rgba(180, 83, 9, 0.12);
+
+  --info: #1D4ED8;
+  --info-bg: rgba(29, 78, 216, 0.10);
+
+  --fire: #E14A17;
+  --fire-bg: rgba(225, 74, 23, 0.12);
+
+  --sidebar-text: #FFF6EA;
+  --sidebar-text-2: #C6B8AD;
+  --sidebar-text-3: #9A8C82;
+  --sidebar-highlight: #F5A524;
+  --nav-active-bg: #C41E2E;
+  --nav-active-bg-hover: #A81828;
+  --nav-active-edge: #DE8709;
+
+  --border: #E4DDD3;
+  --border-light: #D3C9BC;
+  --border-focus: #DE8709;
+
+  --shadow-sm: 0 1px 2px rgba(28, 22, 20, 0.06), 0 1px 3px rgba(28, 22, 20, 0.06);
+  --shadow-md: 0 4px 12px rgba(28, 22, 20, 0.08), 0 2px 4px rgba(28, 22, 20, 0.04);
+  --shadow-lg: 0 12px 32px rgba(28, 22, 20, 0.12), 0 4px 8px rgba(28, 22, 20, 0.06);
+  --shadow-glow: 0 0 0 3px rgba(222, 135, 9, 0.18);
+  --shadow-success-glow: 0 6px 18px rgba(21, 128, 61, 0.28);
 }
 
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  user-select: none;
 }
 
 html, body, #root {
   height: 100%;
-  font-family: var(--font);
-  background: var(--bg-primary);
+  width: 100%;
+  font-family: var(--font-family);
+  background: var(--bg-app);
   color: var(--text-primary);
-  -webkit-font-smoothing: antialiased;
+  direction: rtl;
+  text-align: right;
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* ===== SCROLLBAR ===== */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+input, textarea, select {
+  user-select: text;
+  font-family: var(--font-family);
+}
 
-/* ===== LAYOUT ===== */
+/* ===== SCROLLBARS ===== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-light);
+}
+
+/* ===== APP LAYOUT ===== */
 .app-layout {
   display: flex;
   height: 100vh;
-}
-
-.sidebar {
-  width: 240px;
-  background: var(--bg-sidebar);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  transition: width var(--transition);
+  width: 100vw;
+  background: var(--bg-app);
   overflow: hidden;
 }
 
-.sidebar.collapsed { width: 64px; }
+/* ===== SIDEBAR (RTL Right Side) ===== */
+/* The sidebar stays dark while the working area is light: it anchors the eye and
+   keeps navigation visually separate from the till. Re-pointing the shared tokens
+   here means every nested control inherits the right contrast without its own rule. */
+.sidebar {
+  --text-primary: var(--sidebar-text);
+  --text-secondary: var(--sidebar-text-2);
+  --text-muted: var(--sidebar-text-3);
+  --border: rgba(255, 255, 255, 0.09);
+  --border-light: rgba(255, 255, 255, 0.18);
+  --bg-card: rgba(255, 255, 255, 0.06);
+  --bg-card-hover: rgba(255, 255, 255, 0.11);
 
-.sidebar-header {
-  padding: 20px 16px;
-  border-bottom: 1px solid var(--border);
+  width: 250px;
+  background: var(--bg-sidebar);
+  border-left: 1px solid rgba(0, 0, 0, 0.1);
   display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.sidebar-logo {
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(135deg, var(--accent), #e67e22);
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  font-weight: 800;
-  color: #0f0f12;
+  flex-direction: column;
+  transition: width var(--transition-normal);
+  z-index: 50;
   flex-shrink: 0;
 }
 
+.sidebar.collapsed {
+  width: 72px;
+}
+
+.sidebar-header {
+  padding: 18px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-logo {
+  width: 44px;
+  height: 44px;
+  /* The brand mark carries its own cream ground — no gradient behind it. */
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
+}
+
+.sidebar-brand {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .sidebar-title {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-primary);
+  white-space: nowrap;
+  letter-spacing: -0.2px;
+}
+
+.sidebar-subtitle {
+  font-size: 11px;
+  font-weight: 600;
+  /* The accent itself is too dark to read on the sidebar — its light partner is used. */
+  color: var(--sidebar-highlight);
   white-space: nowrap;
 }
 
-.sidebar-nav { flex: 1; padding: 12px 8px; }
+.sidebar-nav {
+  flex: 1;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all var(--transition);
+  /* Roomy enough to hit reliably with a finger without shrinking the item list. */
+  padding: 13px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--text-secondary);
+  font-family: var(--font-family);
   font-size: 14px;
-  font-weight: 500;
-  white-space: nowrap;
-  border: none;
-  background: none;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
   width: 100%;
-  text-align: left;
+  text-align: right;
+  position: relative;
 }
 
-.nav-item:hover { background: var(--bg-card); color: var(--text-primary); }
+.nav-item:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+/* A solid fill, not a tint: on a dark sidebar the current screen has to be
+   obvious from across the counter. */
 .nav-item.active {
-  background: var(--accent-subtle);
-  color: var(--accent);
-  box-shadow: inset 3px 0 0 var(--accent);
+  background: var(--nav-active-bg);
+  color: #FFFFFF;
+  border-color: transparent;
+  box-shadow: inset 4px 0 0 var(--nav-active-edge);
+}
+
+.nav-item.active:hover {
+  background: var(--nav-active-bg-hover);
+  color: #FFFFFF;
 }
 
 .nav-icon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-  font-size: 18px;
+  font-size: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
 }
 
 .sidebar-footer {
   padding: 16px;
   border-top: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.22);
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .user-avatar {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, var(--accent), #e67e22);
+  width: 38px;
+  height: 38px;
+  background: var(--accent-gradient);
+  color: #FFFFFF;
+  font-weight: 800;
+  font-size: 15px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.user-details {
+  overflow: hidden;
+}
+
+.user-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.user-role-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--sidebar-highlight) 16%, transparent);
+  color: var(--sidebar-highlight);
+  margin-top: 2px;
+}
+
+/* ===== MAIN CONTENT AREA ===== */
+.main-content {
+  flex: 1;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 20px;
+  background: var(--bg-app);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== POS SCREEN — FAST FOOD TOUCHSCREEN LAYOUT ===== */
+.pos-container {
+  display: grid;
+  grid-template-columns: 1fr 410px;
+  gap: 18px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.pos-main-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* POS Header Bar */
+.pos-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 10px 16px;
+  flex-shrink: 0;
+}
+
+.order-type-selector {
+  display: flex;
+  background: var(--bg-input);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  gap: 4px;
+}
+
+.order-type-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.order-type-btn.active {
+  background: var(--accent);
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.search-input-wrapper {
+  position: relative;
+  flex: 1;
+  max-width: 340px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 42px 10px 16px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 600;
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.search-icon-pos {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 15px;
+  pointer-events: none;
+}
+
+/* Category Slider Pills */
+.pos-categories-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.cat-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--radius-full);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: var(--font-family);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.cat-pill-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  border-color: var(--border-light);
+  transform: translateY(-1px);
+}
+
+.cat-pill-btn.active {
+  background: var(--accent-gradient);
+  color: #FFFFFF;
+  border-color: transparent;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 26%, transparent);
+  transform: translateY(-1px);
+}
+
+/* Food Items Grid */
+.pos-items-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding-left: 4px;
+  padding-bottom: 12px;
+}
+
+.pos-items-grid {
+  display: grid;
+  /* 190px keeps a comfortable tap target while still showing a useful number of
+     items — the middle ground between a touchscreen and a mouse. */
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.food-card {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 148px;
+  cursor: pointer;
+  position: relative;
+  transition: all var(--transition-fast);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.food-card:hover:not(.sold-out) {
+  background: var(--bg-card-hover);
+  border-color: var(--accent);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+.food-card:active:not(.sold-out) {
+  transform: scale(0.97);
+}
+
+/* Already in the order — crimson edge and a tinted top so it reads at a glance. */
+.food-card.in-cart {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 7%, transparent) 0%, var(--bg-card) 60%);
+}
+
+.food-card.sold-out {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.8);
+}
+
+.food-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.food-card-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.food-card-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-bottom: 10px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.food-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+/* Price in brand crimson — the number the cashier looks for first. */
+.food-price {
+  font-size: 19px;
+  font-weight: 900;
+  color: var(--accent);
+}
+
+.food-stock-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+}
+
+.food-card-cart-qty {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: var(--accent-gradient);
+  color: #FFFFFF;
+  font-weight: 900;
+  font-size: 13px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 40%, transparent);
+  animation: pulse 1.5s infinite;
+}
+
+/* ===== CART / RECEIPT PANEL (Left in RTL) ===== */
+.pos-cart-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.cart-header-bar {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card-hover);
+}
+
+.cart-header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.cart-items-count-badge {
+  background: var(--accent);
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.cart-items-list {
+  flex: 1;
+  /* min-height:auto (the flex default) makes this refuse to shrink below its own
+     content. With the delivery form open that pushed the totals and the دفع button
+     off the bottom of the panel. Zero lets it give up space and scroll instead. */
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* The delivery form takes at most a quarter of the panel and scrolls inside that. On a
+   short screen it gives up more rather than pushing the price out of sight. */
+.cart-delivery-box {
+  flex-shrink: 1;
+  min-height: 0;
+  max-height: 26vh;
+  overflow-y: auto;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--accent-subtle);
+}
+
+.cart-item-row {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition: all var(--transition-fast);
+}
+
+.cart-item-row:hover {
+  border-color: var(--border-light);
+}
+
+.cart-item-info {
+  flex: 1;
+  overflow: hidden;
+}
+
+.cart-item-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.cart-item-unit-price {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.cart-qty-control {
+  display: flex;
+  align-items: center;
+  background: var(--bg-input);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  padding: 2px;
+  gap: 6px;
+}
+
+.qty-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.qty-btn:hover {
+  background: var(--accent);
+  color: #FFFFFF;
+  border-color: var(--accent);
+}
+
+.qty-number {
+  min-width: 22px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.cart-item-total-price {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--accent);
+  min-width: 65px;
+  text-align: left;
+}
+
+.cart-item-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  font-size: 14px;
+  transition: color var(--transition-fast);
+}
+
+.cart-item-delete-btn:hover {
+  color: var(--danger);
+}
+
+/* Cart Calculation Footer */
+.cart-calculation-footer {
+  padding: 16px 20px;
+  border-top: 2px solid var(--border);
+  background: var(--bg-card-hover);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* Discount, subtotal, payment method and the cash box are useful but not vital, so
+     this is what yields when the delivery form is open — faster than the order list,
+     and by scrolling rather than by hiding anything. */
+  flex-shrink: 4;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* The final price and the pay button. A sibling of the footer rather than part of it,
+   and unshrinkable, so no amount of delivery detail or cart length can push them out
+   of the panel — every other row gives up its space first. */
+.cart-calc-pinned {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 12px 20px 16px;
+  background: var(--bg-card-hover);
+  border-top: 1px solid var(--border-light);
+}
+
+.cart-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.cart-row.discount {
+  color: var(--success);
+}
+
+/* The figure the customer is told — the largest number on the screen. */
+.cart-row.total {
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--text-primary);
+  padding-top: 10px;
+  border-top: 2px solid var(--border-light);
+  margin-top: 4px;
+}
+
+.cart-row.total .total-amount {
+  color: var(--accent);
+}
+
+/* Quick Discount Pills */
+.discount-pills-row {
+  display: flex;
+  gap: 6px;
+}
+
+.discount-pill {
+  flex: 1;
+  padding: 6px 4px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-muted);
+  font-family: var(--font-family);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  transition: all var(--transition-fast);
+}
+
+.discount-pill.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #FFFFFF;
+}
+
+/* Payment Type Switcher */
+.payment-type-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.payment-type-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 10px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--border-light);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-family: var(--font-family);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.payment-type-card:hover {
+  border-color: var(--border-light);
+}
+
+.payment-type-card.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+/* Fast Cash Tender Keypad Buttons */
+.cash-tender-box {
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quick-cash-row {
+  display: flex;
+  gap: 6px;
+}
+
+.quick-cash-btn {
+  flex: 1;
+  padding: 6px 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.quick-cash-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.change-due-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--success-bg);
+  border: 1px solid color-mix(in srgb, var(--success) 28%, transparent);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--success);
+}
+
+/* Big Checkout Button */
+/* The single most-pressed control in the building — big, green, unmistakable. */
+.btn-checkout {
+  width: 100%;
+  padding: 18px 20px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--success-gradient);
+  color: #ffffff;
+  font-family: var(--font-family);
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--success) 32%, transparent);
+  transition: all var(--transition-fast);
+  margin-top: 4px;
+}
+
+.btn-checkout:hover:not(:disabled) {
+  background: var(--success-gradient-hover);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--success) 42%, transparent);
+  transform: translateY(-2px);
+}
+
+.btn-checkout:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-checkout:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ===== GENERAL BUTTONS ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+/* Amber, deliberately NOT crimson: the main action must never look like the
+   delete button sitting next to it. */
+.btn-primary {
+  background: var(--amber-gradient);
+  color: #FFFFFF;
+  border: none;
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--amber) 30%, transparent);
+}
+
+.btn-primary:hover {
+  background: var(--amber-gradient-hover);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--amber) 40%, transparent);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-light);
+}
+
+.btn-success {
+  background: var(--success);
+  color: #ffffff;
+  border: none;
+}
+
+.btn-success:hover {
+  background: var(--success-hover);
+}
+
+.btn-danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 20%, transparent);
+}
+
+.btn-danger:hover {
+  background: color-mix(in srgb, var(--danger) 20%, transparent);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+}
+
+.btn-ghost:hover {
+  color: var(--text-primary);
+  background: var(--bg-card);
+}
+
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-lg { padding: 14px 28px; font-size: 16px; }
+
+/* ===== INPUTS & FORMS ===== */
+.input, .select, .textarea {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--bg-input);
+  /* 1.5px: on a light background a hairline border disappears under bright
+     restaurant lighting, and the field stops looking like a field. */
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: 15px;
+  font-weight: 600;
+  transition: all var(--transition-fast);
+  outline: none;
+  text-align: right;
+}
+
+/* Amber focus ring — the one place amber outranks crimson, so the caret is
+   obvious without competing with the prices on screen. */
+.input:focus, .select:focus, .textarea:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px var(--amber-bg);
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+/* No spinner arrows anywhere. They are a tiny target sitting next to a real one,
+   and a misclick silently changes a price or a quantity by one. Numbers are typed. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  display: block;
   font-size: 13px;
   font-weight: 700;
-  color: #0f0f12;
-  flex-shrink: 0;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
 }
 
-.user-name { font-size: 13px; font-weight: 600; }
-.user-role {
-  font-size: 11px;
-  color: var(--text-muted);
-  text-transform: capitalize;
-}
-
-.main-content {
-  flex: 1;
-  overflow: auto;
-  padding: 24px;
-}
-
-/* ===== CARDS ===== */
+/* ===== CARDS & STAT CARDS ===== */
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 20px;
-  transition: all var(--transition);
+  padding: 22px;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-sm);
 }
-
-.card:hover { border-color: var(--border-light); }
 
 .card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 .card-title {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .stat-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 20px 24px;
+  padding: 22px 24px;
   position: relative;
   overflow: hidden;
 }
@@ -224,541 +1222,381 @@ html, body, #root {
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--accent), transparent);
+  height: 4px;
+  background: var(--accent-gradient);
 }
 
 .stat-value {
-  font-size: 28px;
-  font-weight: 800;
+  font-size: 30px;
+  font-weight: 900;
+  color: var(--text-primary);
   letter-spacing: -0.5px;
+  margin: 6px 0;
 }
 
 .stat-label {
-  font-size: 13px;
-  color: var(--text-muted);
-  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-secondary);
 }
 
 .stat-delta {
   font-size: 12px;
-  font-weight: 600;
-  margin-top: 8px;
+  font-weight: 700;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  border-radius: 100px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
 }
 
 .stat-delta.up { background: var(--success-bg); color: var(--success); }
 .stat-delta.down { background: var(--danger-bg); color: var(--danger); }
 
-/* ===== BUTTONS ===== */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 20px;
-  border-radius: var(--radius-sm);
-  font-family: var(--font);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition);
-  border: 1px solid transparent;
-  white-space: nowrap;
-}
-
-.btn:active { transform: scale(0.97); }
-
-.btn-primary {
-  background: linear-gradient(135deg, var(--accent), #e67e22);
-  color: #0f0f12;
-  border: none;
-  box-shadow: var(--shadow-sm), 0 0 12px rgba(245,158,11,0.15);
-}
-.btn-primary:hover { box-shadow: var(--shadow-md), var(--shadow-glow); transform: translateY(-1px); }
-
-.btn-secondary {
-  background: var(--bg-card);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-}
-.btn-secondary:hover { background: var(--bg-card-hover); border-color: var(--border-light); }
-
-.btn-danger {
-  background: var(--danger-bg);
-  color: var(--danger);
-  border: 1px solid rgba(239,68,68,0.2);
-}
-.btn-danger:hover { background: rgba(239,68,68,0.15); }
-
-.btn-ghost {
-  background: transparent;
-  color: var(--text-secondary);
-  border: none;
-  padding: 8px 12px;
-}
-.btn-ghost:hover { color: var(--text-primary); background: var(--bg-card); }
-
-.btn-sm { padding: 6px 12px; font-size: 12px; }
-.btn-lg { padding: 14px 28px; font-size: 16px; }
-.btn-icon { padding: 8px; width: 36px; height: 36px; }
-
-/* ===== INPUTS ===== */
-.input, .select, .textarea {
-  width: 100%;
-  padding: 10px 14px;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-family: var(--font);
-  font-size: 14px;
-  transition: all var(--transition);
-  outline: none;
-}
-
-.input:focus, .select:focus, .textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
-}
-
-.input::placeholder { color: var(--text-muted); }
-
-.form-group { margin-bottom: 16px; }
-.form-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
-}
-
-/* ===== TABLE ===== */
+/* ===== TABLES ===== */
 .table-container {
   overflow: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
+  background: var(--bg-card);
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+  text-align: right;
 }
 
 th {
-  text-align: left;
-  padding: 12px 16px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
+  padding: 14px 18px;
+  font-size: 13px;
+  font-weight: 800;
+  /* Tinted header row so the column labels stay separate from the data when a
+     long table is scrolled. */
+  color: var(--text-secondary);
+  background: var(--bg-card-hover);
+  border-bottom: 2px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 td {
-  padding: 12px 16px;
+  padding: 14px 18px;
   font-size: 14px;
+  font-weight: 600;
   border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
 }
 
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: var(--bg-card); }
+tr:last-child td {
+  border-bottom: none;
+}
 
-/* ===== BADGE ===== */
+tr:hover td {
+  background: var(--bg-card-hover);
+}
+
+/* ===== BADGES ===== */
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 3px 10px;
-  border-radius: 100px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
+  gap: 4px;
+  padding: 5px 11px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 800;
 }
 
-.badge-success { background: var(--success-bg); color: var(--success); }
-.badge-danger { background: var(--danger-bg); color: var(--danger); }
-.badge-warning { background: var(--warning-bg); color: var(--warning); }
-.badge-info { background: var(--info-bg); color: var(--info); }
+.badge-success { background: var(--success-bg); color: var(--success); border: 1px solid color-mix(in srgb, var(--success) 22%, transparent); }
+.badge-danger  { background: var(--danger-bg);  color: var(--danger);  border: 1px solid color-mix(in srgb, var(--danger) 22%, transparent); }
+.badge-warning { background: var(--warning-bg); color: var(--warning); border: 1px solid color-mix(in srgb, var(--warning) 22%, transparent); }
+.badge-info    { background: var(--info-bg);    color: var(--info);    border: 1px solid color-mix(in srgb, var(--info) 20%, transparent); }
 
-/* ===== MODAL ===== */
+/* ===== MODALS ===== */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(4px);
+  background: var(--bg-overlay);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   animation: fadeIn 200ms ease;
+  padding: 20px;
 }
 
 .modal {
-  background: var(--bg-secondary);
+  background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   padding: 28px;
-  width: 90%;
-  max-width: 500px;
-  max-height: 85vh;
-  overflow: auto;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
   box-shadow: var(--shadow-lg);
   animation: slideUp 250ms ease;
 }
 
 .modal-title {
   font-size: 20px;
-  font-weight: 700;
-  margin-bottom: 20px;
-}
-
-/* ===== POS GRID ===== */
-.pos-layout {
-  display: grid;
-  grid-template-columns: 1fr 380px;
-  gap: 20px;
-  height: calc(100vh - 48px);
-}
-
-.category-tabs {
-  display: flex;
-  gap: 8px;
-  padding: 4px;
-  overflow-x: auto;
-  margin-bottom: 16px;
-}
-
-.category-tab {
-  padding: 8px 18px;
-  border-radius: 100px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition);
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.category-tab:hover { border-color: var(--border-light); color: var(--text-primary); }
-.category-tab.active {
-  background: var(--accent);
-  color: #0f0f12;
-  border-color: var(--accent);
-}
-
-.items-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
-  overflow-y: auto;
-  padding-bottom: 16px;
-}
-
-.item-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 16px 12px;
-  text-align: center;
-  cursor: pointer;
-  transition: all var(--transition);
-  position: relative;
-}
-
-.item-card:hover:not(.sold-out) {
-  border-color: var(--accent);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md), var(--shadow-glow);
-}
-
-.item-card.sold-out {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.item-card .item-name {
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 6px;
-  line-height: 1.3;
-}
-
-.item-card .item-price {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--accent);
-}
-
-.item-card .stock-badge {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  font-size: 10px;
-  padding: 2px 6px;
-}
-
-/* ===== CART ===== */
-.cart-panel {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.cart-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-  font-size: 16px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.cart-items {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px;
-}
-
-.cart-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  margin-bottom: 4px;
-  transition: background var(--transition);
-}
-
-.cart-item:hover { background: var(--bg-card); }
-
-.cart-item-name { font-size: 13px; font-weight: 500; flex: 1; }
-.cart-item-qty {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 12px;
-}
-
-.qty-btn {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--transition);
-}
-
-.qty-btn:hover { border-color: var(--accent); color: var(--accent); }
-
-.cart-item-total { font-size: 13px; font-weight: 600; min-width: 60px; text-align: right; }
-
-.cart-footer {
-  padding: 16px 20px;
-  border-top: 1px solid var(--border);
-}
-
-.cart-summary-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 0;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.cart-total-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 0;
-  font-size: 18px;
   font-weight: 800;
+  margin-bottom: 20px;
   color: var(--text-primary);
-  border-top: 1px solid var(--border);
-  margin-top: 8px;
 }
 
-.payment-toggle {
-  display: flex;
-  gap: 8px;
+/* ===== THERMAL RECEIPT MODAL ===== */
+.receipt-paper {
+  background: #ffffff;
+  color: #111827;
+  padding: 24px;
+  border-radius: var(--radius-md);
+  font-family: 'Consolas', 'Courier New', monospace;
+  max-width: 360px;
+  margin: 0 auto;
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+
+.receipt-header h2 {
+  font-size: 20px;
+  font-weight: 900;
+  margin-bottom: 4px;
+  color: #111827;
+}
+
+.receipt-divider {
+  border-top: 1px dashed #9ca3b0;
   margin: 12px 0;
 }
 
-.payment-btn {
-  flex: 1;
-  padding: 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  font-family: var(--font);
+.receipt-table {
+  width: 100%;
+  font-size: 12px;
+  margin: 10px 0;
+  text-align: right;
+}
+
+.receipt-table th {
+  background: #f3f4f6;
+  color: #374151;
+  padding: 6px 8px;
+  font-size: 11px;
+}
+
+.receipt-table td {
+  padding: 6px 8px;
+  color: #111827;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.receipt-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition);
+  font-weight: 700;
 }
 
-.payment-btn.active {
-  background: var(--accent-subtle);
-  border-color: var(--accent);
-  color: var(--accent);
+.receipt-total-big {
+  font-size: 18px;
+  font-weight: 900;
+  border-top: 2px solid #111827;
+  padding-top: 6px;
+  margin-top: 6px;
 }
 
-/* ===== LOGIN ===== */
+/* ===== LOGIN SCREEN ===== */
 .login-container {
   display: flex;
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: radial-gradient(ellipse at 50% 0%, rgba(245,158,11,0.08), transparent 60%),
-              var(--bg-primary);
+  width: 100vw;
+  /* Warm crimson wash behind the sign-in card — brand presence without noise. */
+  background: radial-gradient(circle at 50% 8%, color-mix(in srgb, var(--accent) 10%, transparent) 0%, var(--bg-app) 65%);
 }
 
 .login-card {
-  background: var(--bg-secondary);
+  background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   padding: 40px;
-  width: 400px;
+  width: 420px;
   box-shadow: var(--shadow-lg);
+  text-align: center;
 }
 
 .login-logo {
-  width: 64px;
-  height: 64px;
-  background: linear-gradient(135deg, var(--accent), #e67e22);
+  width: 88px;
+  height: 88px;
+  /* The brand mark carries its own cream ground — no gradient behind it. */
   border-radius: var(--radius-lg);
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
-  font-weight: 800;
-  color: #0f0f12;
-  margin: 0 auto 20px;
+  margin: 0 auto 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 .login-title {
-  text-align: center;
   font-size: 24px;
-  font-weight: 700;
-  margin-bottom: 8px;
+  font-weight: 900;
+  color: var(--text-primary);
+  margin-bottom: 6px;
 }
 
 .login-subtitle {
-  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--text-muted);
-  font-size: 14px;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .login-tabs {
   display: flex;
-  gap: 4px;
-  margin-bottom: 24px;
-  background: var(--bg-card);
+  background: var(--bg-input);
   padding: 4px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
+  margin-bottom: 24px;
+  gap: 4px;
 }
 
 .login-tab {
   flex: 1;
-  padding: 8px;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 600;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all var(--transition);
-  color: var(--text-muted);
+  padding: 10px;
+  border-radius: var(--radius-sm);
   border: none;
-  background: none;
-  font-family: var(--font);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-family);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
 .login-tab.active {
   background: var(--accent);
-  color: #0f0f12;
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.pin-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 16px 0 24px;
+  height: 40px;
+}
+
+.pin-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: all var(--transition-fast);
+}
+
+.pin-dot.filled {
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+  transform: scale(1.15);
 }
 
 .pin-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  max-width: 240px;
-  margin: 16px auto;
+  gap: 10px;
+  max-width: 280px;
+  margin: 0 auto;
 }
 
 .pin-btn {
-  width: 64px;
   height: 64px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text-primary);
-  font-size: 22px;
-  font-weight: 700;
-  font-family: var(--font);
+  font-family: var(--font-family);
+  font-size: 24px;
+  font-weight: 800;
   cursor: pointer;
-  transition: all var(--transition);
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all var(--transition-fast);
 }
 
-.pin-btn:hover { border-color: var(--accent); background: var(--accent-subtle); }
-.pin-btn:active { transform: scale(0.95); }
+.pin-btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent);
+  color: var(--accent);
+}
 
-.pin-display {
-  text-align: center;
-  font-size: 32px;
-  letter-spacing: 12px;
-  margin-bottom: 16px;
-  height: 48px;
+.pin-btn:active {
+  transform: scale(0.93);
+}
+
+/* ===== GRID UTILITIES ===== */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+
+/* ===== PAGE HEADER ===== */
+.page-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 22px;
 }
 
-.pin-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--border);
-  transition: all var(--transition);
+.page-title {
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--text-primary);
 }
 
-.pin-dot.filled { background: var(--accent); box-shadow: 0 0 8px rgba(245,158,11,0.3); }
+.page-subtitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
 
-/* ===== GRID LAYOUTS ===== */
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+/* ===== TOAST NOTIFICATIONS ===== */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  padding: 14px 22px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: var(--shadow-lg);
+  z-index: 2000;
+  animation: slideUp 250ms ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /*
+    An announcement, never a target. Without this it sits over the bottom-left corner
+    of whatever screen is open and silently eats every click and keystroke aimed at
+    what is underneath — for three seconds after every save. On the settings screen
+    that corner holds real fields, so the symptom is "sometimes the inputs don't take
+    input", which is impossible to pin down because it depends on where you clicked
+    and how recently you saved.
+  */
+  pointer-events: none;
+}
 
-/* ===== ANIMATIONS ===== */
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-
-.animate-fade { animation: fadeIn 300ms ease; }
-.animate-slide { animation: slideUp 300ms ease; }
+.toast-success { background: var(--success); color: #ffffff; box-shadow: var(--shadow-success-glow); }
+.toast-error { background: var(--danger); color: #ffffff; }
+.toast-warning { background: var(--warning); color: #FFFFFF; }
 
 /* ===== EMPTY STATE ===== */
 .empty-state {
@@ -771,85 +1609,62 @@ tr:hover td { background: var(--bg-card); }
   text-align: center;
 }
 
-.empty-state-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
-.empty-state-text { font-size: 15px; }
-
-/* ===== ALERT/TOAST ===== */
-.toast {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  padding: 14px 20px;
-  border-radius: var(--radius-md);
-  font-size: 14px;
-  font-weight: 500;
-  box-shadow: var(--shadow-lg);
-  z-index: 2000;
-  animation: slideUp 300ms ease;
-  max-width: 400px;
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 14px;
+  opacity: 0.6;
 }
 
-.toast-success { background: var(--success); color: #fff; }
-.toast-error { background: var(--danger); color: #fff; }
-.toast-warning { background: var(--warning); color: #0f0f12; }
-
-/* ===== PAGE HEADER ===== */
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 24px;
-}
-
-.page-title {
-  font-size: 24px;
+.empty-state-text {
+  font-size: 15px;
   font-weight: 700;
 }
 
-.page-subtitle {
-  font-size: 14px;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
+/* ===== ANIMATIONS ===== */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.75; transform: scale(0.92); } }
 
-/* ===== SEARCH ===== */
-.search-box {
-  position: relative;
-}
+.animate-fade { animation: fadeIn 250ms ease; }
+.animate-slide { animation: slideUp 250ms ease; }
 
-.search-box .input {
-  padding-left: 38px;
-}
-
-.search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-muted);
-  font-size: 14px;
-}
-
-/* ===== TABS ===== */
-.tabs {
+/* Standing warning shown while any seeded account still has its factory
+   password or PIN. Deliberately loud and not dismissible — the app ships with
+   publicly known credentials and must not look normal until they are changed. */
+.default-credentials-banner {
   display: flex;
-  gap: 4px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 20px;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.6;
 }
 
-.tab {
-  padding: 10px 18px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-muted);
-  cursor: pointer;
-  border: none;
-  background: none;
-  font-family: var(--font);
-  border-bottom: 2px solid transparent;
-  transition: all var(--transition);
+/* Practice database — deliberately loud, and striped so it cannot be mistaken for
+   a normal notice or ignored after a few minutes on screen. */
+.demo-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1.5px solid var(--amber);
+  border-radius: var(--radius-sm);
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--amber) 13%, transparent) 0 14px,
+    color-mix(in srgb, var(--amber) 6%, transparent) 14px 28px
+  );
+  color: var(--warning);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.6;
 }
 
-.tab:hover { color: var(--text-primary); }
-.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.demo-banner span:first-child { font-size: 18px; }

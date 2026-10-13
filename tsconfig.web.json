@@ -4,7 +4,9 @@
     "composite": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "outDir": "./out/renderer",
+    // Type-check only — see the note in tsconfig.node.json.
+    "noEmit": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.web.tsbuildinfo",
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },

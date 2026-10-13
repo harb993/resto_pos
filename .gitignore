@@ -1,4 +1,6 @@
-node_modules/
+node_modules
+# Node-ABI copy of better-sqlite3 staged by scripts/setup-test-sqlite.mjs
+.test-sqlite/
 out/
 dist/
 *.db
@@ -8,3 +10,17 @@ backups/
 .env
 .DS_Store
 Thumbs.db
+license-private.pem
+
+# The real restaurant's data — invoices, customers' phone numbers, shift reports.
+# Not only the .db files: the folder also holds exported PDFs and workbooks, and
+# renamed database copies that the *.db rule above does not match.
+production data/
+_data-preserved-*/
+
+# Vendor printer drivers and manuals — 89 MB of installers, not part of the code.
+printer/
+# Leftover build-tool temp files
+electron.vite.config.*.mjs
+# Local assistant state
+.claude/

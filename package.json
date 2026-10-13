@@ -7,27 +7,29 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "postinstall": "electron-rebuild -f -w better-sqlite3",
-    "package": "electron-builder --win",
-    "package:dir": "electron-builder --dir",
-    "lint": "tsc --noEmit",
+    "postinstall": "cd node_modules/better-sqlite3 && npx prebuild-install --runtime electron --target 31.0.0",
+    "package": "npm run build && electron-builder --win",
+    "package:dir": "npm run build && electron-builder --dir",
+    "package:portable": "npm run build && electron-builder --win portable",
+    "lint": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
-    "better-sqlite3": "^11.0.0",
-    "bcryptjs": "^2.4.3",
-    "electron-log": "^5.1.0",
-    "zustand": "^4.5.0",
     "@tanstack/react-query": "^5.50.0",
-    "recharts": "^2.12.0",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.0.0",
+    "electron-log": "^5.1.0",
+    "exceljs": "^4.4.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "react-router-dom": "^6.23.0"
+    "react-router-dom": "^6.23.0",
+    "recharts": "^2.15.4",
+    "zustand": "^4.5.0"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.6.0",
-    "@types/better-sqlite3": "^7.6.0",
     "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^7.6.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
@@ -40,15 +42,43 @@
   },
   "build": {
     "appId": "com.resto.pos",
-    "productName": "Resto POS",
+    "productName": "Crispo",
     "asar": true,
     "asarUnpack": [
       "**/node_modules/better-sqlite3/**"
     ],
-    "npmRebuild": true,
+    "npmRebuild": false,
+    "files": [
+      "out/**/*",
+      "build/icon.ico",
+      "build/icon.png",
+      "build/receipt-logo.png",
+      "package.json"
+    ],
+    "extraResources": [
+      "build/icon.ico",
+      "build/icon.png",
+      "build/receipt-logo.png"
+    ],
     "win": {
-      "target": "nsis",
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "build/icon.ico"
+    },
+    "portable": {
+      "splashImage": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,
