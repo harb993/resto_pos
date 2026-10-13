@@ -79,10 +79,22 @@ jobs:
           if (-not (Select-String -Path $log.FullName -Pattern '\[License\] Device' -Quiet)) { throw 'startup did not finish' }
           if (-not (Test-Path (Join-Path $root 'aboeldahab\data\restaurant.db'))) { throw 'no data\restaurant.db beside the exe' }
 
-          # The first-run desktop shortcut, and that it opens this .exe.
-          $desktop = [Environment]::GetFolderPath('Desktop')
+          # The first-run desktop shortcut, and that it opens this .exe. Every desktop
+          # Windows might mean is listed, with what each shortcut on it opens.
           $shell = New-Object -ComObject WScript.Shell
-          $links = Get-ChildItem $desktop -Filter *.lnk -ErrorAction SilentlyContinue |
-            Where-Object { $shell.CreateShortcut($_.FullName).TargetPath -eq $exe }
-          if (-not $links) { throw "no desktop shortcut to $exe" }
-          $links | ForEach-Object { "shortcut: $($_.Name) -> $($shell.CreateShortcut($_.FullName).TargetPath) icon $($shell.CreateShortcut($_.FullName).IconLocation)" }
+          $want = [IO.Path]::GetFullPath($exe)
+          $dirs = @(
+            [Environment]::GetFolderPath('Desktop'),
+            [Environment]::GetFolderPath('DesktopDirectory'),
+            [Environment]::GetFolderPath('CommonDesktopDirectory'),
+            (Join-Path $env:USERPROFILE 'Desktop')
+          ) | Where-Object { $_ -and (Test-Path $_) } | Sort-Object -Unique
+          $found = $false
+          foreach ($d in $dirs) {
+            foreach ($l in Get-ChildItem -LiteralPath $d -Filter *.lnk -ErrorAction SilentlyContinue) {
+              $sc = $shell.CreateShortcut($l.FullName)
+              "shortcut: $($l.FullName) -> $($sc.TargetPath) | icon $($sc.IconLocation)"
+              if ($sc.TargetPath -and ([IO.Path]::GetFullPath($sc.TargetPath) -ieq $want)) { $found = $true }
+            }
+          }
+          if (-not $found) { throw "no desktop shortcut opens $want (looked in: $($dirs -join ', '))" }

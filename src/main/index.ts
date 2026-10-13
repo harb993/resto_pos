@@ -155,7 +155,7 @@ function placeDesktopShortcut(): void {
         fs.writeFileSync(markerFile, new Date().toISOString())
       },
     })
-    if (outcome !== 'skipped') log.info(`[Shortcut] Desktop shortcut: ${outcome}`)
+    if (outcome !== 'skipped') log.info(`[Shortcut] Desktop shortcut: ${outcome} (${app.getPath('desktop')})`)
   } catch (err) {
     log.warn('[Shortcut] Could not place the desktop shortcut:', err)
   }
@@ -288,7 +288,7 @@ app.whenReady().then(async () => {
   // logged either way, because "which device id is this PC" is the first question
   // asked whenever an activation goes wrong.
   const licence = getLicenseStatus()
-  log.info(`[License] Device ${licence.deviceId} â€” ${licence.activated ? 'activated' : 'NOT activated'}`)
+  log.info(`[License] Device ${licence.deviceId} — ${licence.activated ? 'activated' : 'NOT activated'}`)
 
   if (licence.activated) {
     // Take up this machine's place on the network â€” master, node, or neither. Done
