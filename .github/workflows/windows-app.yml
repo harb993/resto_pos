@@ -90,10 +90,14 @@ jobs:
             (Join-Path $env:USERPROFILE 'Desktop')
           ) | Where-Object { $_ -and (Test-Path $_) } | Sort-Object -Unique
           $found = $false
+          # WScript cannot open a .lnk whose NAME is Arabic — it hands back an empty
+          # shortcut instead of failing — so each one is read through an ASCII-named copy.
+          $probe = Join-Path $env:RUNNER_TEMP 'probe.lnk'
           foreach ($d in $dirs) {
             foreach ($l in Get-ChildItem -LiteralPath $d -Filter *.lnk -ErrorAction SilentlyContinue) {
-              $sc = $shell.CreateShortcut($l.FullName)
-              "shortcut: $($l.FullName) -> $($sc.TargetPath) | icon $($sc.IconLocation)"
+              Copy-Item -LiteralPath $l.FullName $probe -Force
+              $sc = $shell.CreateShortcut($probe)
+              "shortcut: $($l.FullName) -> $($sc.TargetPath) | icon $($sc.IconLocation) | start in $($sc.WorkingDirectory)"
               if ($sc.TargetPath -and ([IO.Path]::GetFullPath($sc.TargetPath) -ieq $want)) { $found = $true }
             }
           }
