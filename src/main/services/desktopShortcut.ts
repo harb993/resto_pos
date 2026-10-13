@@ -21,8 +21,11 @@ import path from 'node:path'
 /** What the shortcut is called on the desktop. */
 export const SHORTCUT_NAME = 'أبو الدهب'
 
-/** Settings key recording that the shortcut has had its one turn on this machine. */
-export const SHORTCUT_MARKER_KEY = 'desktop_shortcut_offered'
+/**
+ * File, in the per-user app-data folder, recording that the shortcut has had its one
+ * turn on this PC. Not in the shop's database: that travels with the program folder.
+ */
+export const SHORTCUT_MARKER_FILE = 'desktop-shortcut-offered'
 
 export interface ShortcutOptions {
   target: string

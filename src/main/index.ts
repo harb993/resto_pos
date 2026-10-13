@@ -1,9 +1,9 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, Menu, shell } from 'electron'
 import path from 'node:path'
 import log from 'electron-log/main'
 import {
   initDatabase, closeDatabase, runBackup, isDemoMode, refreshDemoDatabaseIfStale,
-  clearAllBusinessData, getDb,
+  clearAllBusinessData,
 } from './db/db'
 import { registerAuthIpc } from './ipc/auth.ipc'
 import { registerMenuIpc } from './ipc/menu.ipc'
@@ -44,7 +44,7 @@ import { tickWorkShift, getWorkShiftStatus, onWorkShiftChanged } from './service
 import { getSettings } from './services/settingsService'
 import { getCurrentSession } from './services/authService'
 import { restoreCatalogCostsOnce } from './services/menuImportService'
-import { ensureDesktopShortcut, SHORTCUT_MARKER_KEY } from './services/desktopShortcut'
+import { ensureDesktopShortcut, SHORTCUT_MARKER_FILE } from './services/desktopShortcut'
 
 import fs from 'node:fs'
 
@@ -133,7 +133,10 @@ function createWindow(): void {
 
 function placeDesktopShortcut(): void {
   try {
-    const marker = getDb().prepare('SELECT value FROM settings WHERE key = ?')
+    // Kept per PC and per Windows user — beside the licence key — not in the shop's
+    // database: that lives in the program folder, and a folder copied to a new till
+    // would otherwise arrive saying the new desktop had already had its shortcut.
+    const markerFile = path.join(app.getPath('userData'), SHORTCUT_MARKER_FILE)
     const outcome = ensureDesktopShortcut({
       platform: process.platform,
       isPackaged: app.isPackaged,
@@ -146,9 +149,10 @@ function placeDesktopShortcut(): void {
         try { return shell.readShortcutLink(file).target || null } catch { return null }
       },
       write: (file, operation, options) => shell.writeShortcutLink(file, operation, options),
-      alreadyOffered: () => (marker.get(SHORTCUT_MARKER_KEY) as { value: string } | undefined)?.value === '1',
+      alreadyOffered: () => fs.existsSync(markerFile),
       markOffered: () => {
-        getDb().prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(SHORTCUT_MARKER_KEY, '1')
+        fs.mkdirSync(path.dirname(markerFile), { recursive: true })
+        fs.writeFileSync(markerFile, new Date().toISOString())
       },
     })
     if (outcome !== 'skipped') log.info(`[Shortcut] Desktop shortcut: ${outcome}`)
@@ -158,6 +162,11 @@ function placeDesktopShortcut(): void {
 }
 
 app.whenReady().then(async () => {
+  // No menu bar. Electron's default one is English, and it carries Reload (Ctrl+R) —
+  // one stray key mid-order reloads the till and the cart with it — and the developer
+  // tools. Copy and paste in text boxes work without it on Windows.
+  Menu.setApplicationMenu(null)
+
   // 1. Initialize database. Normally the restaurant's own; the showcase account
   //    switches to its separate one when it signs in.
   if (isDemoMode()) refreshDemoDatabaseIfStale()
