@@ -1,0 +1,88 @@
+name: Windows app
+
+# Builds the أبو الدهب till on a real Windows machine and attaches it to the run as a
+# download: Actions → the latest "Windows app" run → Artifacts → AboElDahab-Windows.
+# Unzip it, move the "aboeldahab" folder to the Desktop and run AboElDahab.exe.
+#
+# Then it starts that build on the same Windows machine and reads its log, so a build
+# that cannot open its database or reach its first screen is caught here rather than
+# at the restaurant.
+
+on:
+  push:
+    branches: ['claude/affectionate-knuth-hmaykf']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # postinstall fetches better-sqlite3 built for Electron on Windows.
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # On Windows electron-builder stamps the logo (build/icon.ico) into the .exe itself.
+      - name: Package
+        run: npx electron-builder --win dir --x64 --publish never
+
+      - name: Assemble the download
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item dist/win-unpacked release/aboeldahab -Recurse
+          Copy-Item tools/first-run/* release/aboeldahab/
+          $exe = Get-Item release/aboeldahab/AboElDahab.exe
+          "AboElDahab.exe: $([math]::Round($exe.Length / 1MB)) MB, version $($exe.VersionInfo.FileVersion)"
+          $native = Get-ChildItem release/aboeldahab/resources -Recurse -Filter better_sqlite3.node
+          if (-not $native) { throw 'better_sqlite3.node is missing from the package' }
+          $native.FullName
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AboElDahab-Windows
+          path: release/
+          retention-days: 30
+
+      # On a copy, so the database the first run creates never ends up in the download.
+      - name: Smoke test — start it and read its log
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'smoke'
+          New-Item -ItemType Directory -Force $root | Out-Null
+          Copy-Item release/aboeldahab (Join-Path $root 'aboeldahab') -Recurse
+          $exe = Join-Path $root 'aboeldahab\AboElDahab.exe'
+
+          $p = Start-Process $exe -PassThru
+          Start-Sleep -Seconds 30
+          $alive = -not $p.HasExited
+          Get-Process AboElDahab -ErrorAction SilentlyContinue | Stop-Process -Force
+          Start-Sleep -Seconds 3
+
+          $log = Get-ChildItem $env:APPDATA -Recurse -Filter main.log -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $log) { throw 'the app wrote no log — it did not start' }
+          "---- $($log.FullName)"
+          Get-Content $log.FullName -Tail 80
+
+          if (-not $alive) { throw 'the app exited by itself within 30 seconds' }
+          if (-not (Select-String -Path $log.FullName -Pattern 'Schema applied' -Quiet)) { throw 'the database did not open' }
+          if (-not (Select-String -Path $log.FullName -Pattern '\[License\] Device' -Quiet)) { throw 'startup did not finish' }
+          if (-not (Test-Path (Join-Path $root 'aboeldahab\data\restaurant.db'))) { throw 'no data\restaurant.db beside the exe' }
+
+          # The first-run desktop shortcut, and that it opens this .exe.
+          $desktop = [Environment]::GetFolderPath('Desktop')
+          $shell = New-Object -ComObject WScript.Shell
+          $links = Get-ChildItem $desktop -Filter *.lnk -ErrorAction SilentlyContinue |
+            Where-Object { $shell.CreateShortcut($_.FullName).TargetPath -eq $exe }
+          if (-not $links) { throw "no desktop shortcut to $exe" }
+          $links | ForEach-Object { "shortcut: $($_.Name) -> $($shell.CreateShortcut($_.FullName).TargetPath) icon $($shell.CreateShortcut($_.FullName).IconLocation)" }
