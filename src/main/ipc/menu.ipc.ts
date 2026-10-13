@@ -19,7 +19,14 @@ export function registerMenuIpc(): void {
   handle('menu:upsertCategory', async (_e, data): Promise<IpcResponse> => {
     try {
       requireRole('owner')
-      const cat = menu.upsertCategory(data.name, data.displayOrder ?? 0, data.categoryId)
+      // Only a printerId the screen actually sent is applied; absent, the category
+      // keeps the printer it already had.
+      const printerId = data.printerId === undefined ? undefined
+        : data.printerId === null ? null : Number(data.printerId)
+      if (printerId !== undefined && printerId !== null && !Number.isInteger(printerId)) {
+        throw new Error('الطابعة المختارة غير صحيحة')
+      }
+      const cat = menu.upsertCategory(data.name, data.displayOrder ?? 0, data.categoryId, printerId)
       return { success: true, data: cat }
     } catch (err: any) { return { success: false, error: err.message } }
   })

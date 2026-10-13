@@ -66,7 +66,13 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS categories (
     category_id   INTEGER PRIMARY KEY AUTOINCREMENT,
     name          TEXT NOT NULL,
-    display_order INTEGER NOT NULL DEFAULT 0
+    display_order INTEGER NOT NULL DEFAULT 0,
+    -- Which prep printer this category's items are sent to, chosen on the categories
+    -- screen. NULL leaves it to the printers' own category lists (the old behaviour);
+    -- 0 means no prep ticket at all — drinks handed over at the till. Deliberately not
+    -- a foreign key: 0 is not a printer, and the shop-data import writes categories
+    -- before printers. Deleting a printer clears it here — see printerService.
+    printer_id    INTEGER
 );
 
 -- Menu items (simple stock model — stock_quantity on the item itself)

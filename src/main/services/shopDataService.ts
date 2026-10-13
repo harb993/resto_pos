@@ -66,7 +66,7 @@ const SETTING_LABELS: Record<string, string> = {
  * It is also why an import replaces these tables rather than adding to them.
  */
 const TABLES = [
-  { key: 'categories', table: 'categories', columns: ['category_id', 'name', 'display_order'] },
+  { key: 'categories', table: 'categories', columns: ['category_id', 'name', 'display_order', 'printer_id'] },
   {
     key: 'menuItems', table: 'menu_items',
     columns: ['item_id', 'category_id', 'name', 'price', 'cost_price', 'baseline_cost', 'description',

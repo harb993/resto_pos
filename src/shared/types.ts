@@ -56,6 +56,11 @@ export interface Category {
   category_id: number
   name: string
   display_order: number
+  /**
+   * The prep printer this category's items go to. NULL: whatever the printers' own
+   * category lists say. 0: no prep ticket at all, the cashier's receipt only.
+   */
+  printer_id?: number | null
 }
 
 export interface MenuItem {

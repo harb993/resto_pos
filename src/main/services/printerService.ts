@@ -7,6 +7,7 @@
  *
  *   receipt   the customer's invoice, prices and all — every order
  *   kitchen   a priceless prep ticket, optionally filtered to certain categories
+ *             (or picked per category on the categories screen — see stationItems)
  *   bar       the same, for drinks; a separate role so it can be switched off alone
  *   delivery  a second copy of the invoice for the rider — delivery orders only
  *
@@ -120,6 +121,10 @@ export function upsertPrinter(input: PrinterInput): Printer {
         station = @station, auto_print = @auto_print, is_active = @is_active, display_order = @display_order
       WHERE printer_id = @printer_id
     `).run({ ...values, printer_id: input.printerId })
+    // A category sent to this printer was sent to a prep STATION. Once it is the
+    // customer's receipt printer instead, those categories go back to automatic rather
+    // than silently printing no prep ticket anywhere.
+    if (!PREP_ROLES.includes(values.role)) releaseCategories(input.printerId)
     const updated = getPrinter(input.printerId)
     if (!updated) throw new Error('الطابعة غير موجودة')
     log.info(`[Print] Updated printer #${input.printerId} "${values.name}"`)
@@ -142,8 +147,18 @@ export function upsertPrinter(input: PrinterInput): Printer {
 export function deletePrinter(printerId: number): void {
   const printer = getPrinter(printerId)
   if (!printer) throw new Error('الطابعة غير موجودة')
-  getDb().prepare('DELETE FROM printers WHERE printer_id = ?').run(printerId)
+  const db = getDb()
+  db.transaction(() => {
+    releaseCategories(printerId)
+    db.prepare('DELETE FROM printers WHERE printer_id = ?').run(printerId)
+  })()
   log.info(`[Print] Removed printer "${printer.name}"`)
+}
+
+/** Categories that were sent to this printer go back to automatic routing. */
+function releaseCategories(printerId: number): void {
+  const res = getDb().prepare('UPDATE categories SET printer_id = NULL WHERE printer_id = ?').run(printerId)
+  if (res.changes > 0) log.info(`[Print] ${res.changes} category(ies) released from printer #${printerId}`)
 }
 
 /** Whatever Windows already has installed — the pick-list when adding a printer. */
@@ -268,7 +283,8 @@ export function buildTicketOrder(orderId: number, tenderedAmount?: number): Tick
 
   const items = db.prepare(`
     SELECT oi.quantity, oi.unit_price, oi.variant_label,
-           mi.name AS item_name, mi.category_id, c.name AS category_name
+           mi.name AS item_name, mi.category_id, c.name AS category_name,
+           c.printer_id AS category_printer_id
     FROM order_items oi
     JOIN menu_items mi ON mi.item_id = oi.menu_item_id
     LEFT JOIN categories c ON c.category_id = mi.category_id
@@ -277,6 +293,7 @@ export function buildTicketOrder(orderId: number, tenderedAmount?: number): Tick
   `).all(orderId) as {
     quantity: number; unit_price: number; variant_label: string | null
     item_name: string; category_id: number | null; category_name: string | null
+    category_printer_id: number | null
   }[]
 
   // The discount is stored as an amount; the receipt shows the percentage it came
@@ -306,6 +323,7 @@ export function buildTicketOrder(orderId: number, tenderedAmount?: number): Tick
       unitPrice: i.unit_price,
       categoryId: i.category_id,
       categoryName: i.category_name,
+      categoryPrinterId: i.category_printer_id,
     })),
     subtotal: row.subtotal,
     tax: row.tax,
@@ -354,6 +372,27 @@ function parseCategoryIds(raw: string | null): number[] {
   } catch {
     return []
   }
+}
+
+/**
+ * Which of an order's lines a prep station is responsible for.
+ *
+ * A category sent to a particular printer on the categories screen goes there and
+ * nowhere else — that choice is made per category precisely so it does not depend on
+ * every other station's list leaving it out. A category set to "no prep ticket" goes
+ * to none of them. Everything else follows the printer's own category list, where an
+ * empty list means "everything", as it always has.
+ */
+export function stationItems<T extends Pick<TicketItem, 'categoryId' | 'categoryPrinterId'>>(
+  printer: Pick<Printer, 'printer_id' | 'category_ids'>,
+  items: T[],
+): T[] {
+  const only = parseCategoryIds(printer.category_ids)
+  return items.filter(i => {
+    if (i.categoryPrinterId === 0) return false
+    if (i.categoryPrinterId != null) return i.categoryPrinterId === printer.printer_id
+    return only.length === 0 || (i.categoryId != null && only.includes(i.categoryId))
+  })
 }
 
 /**
@@ -471,10 +510,7 @@ function pageFor(
     case 'counter':
     case 'kitchen':
     case 'bar': {
-      const only = parseCategoryIds(printer.category_ids)
-      const items = only.length
-        ? order.items.filter(i => i.categoryId != null && only.includes(i.categoryId))
-        : order.items
+      const items = stationItems(printer, order.items)
       if (items.length === 0) return null
 
       // The counter bags the order and hands it over, so its ticket carries who it is
@@ -546,7 +582,7 @@ export async function printOrder(
 }
 
 /** The stations that were told to cook — and so are the ones that must be told to stop. */
-const PREP_ROLES: PrinterRole[] = ['kitchen', 'bar', 'counter']
+export const PREP_ROLES: PrinterRole[] = ['kitchen', 'bar', 'counter']
 
 /**
  * Tell the kitchen an invoice has been cancelled.
@@ -586,10 +622,7 @@ export async function printVoidedOrder(
   const results: PrintJobResult[] = []
 
   for (const printer of stations) {
-    const only = parseCategoryIds(printer.category_ids)
-    const items = only.length
-      ? order.items.filter(i => i.categoryId != null && only.includes(i.categoryId))
-      : order.items
+    const items = stationItems(printer, order.items)
     if (items.length === 0) {
       results.push({
         printerId: printer.printer_id, printerName: printer.name,

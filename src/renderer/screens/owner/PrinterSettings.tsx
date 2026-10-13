@@ -241,6 +241,28 @@ export default function PrinterSettings({ settings, update, showToast }: Props) 
     }
   }
 
+  /**
+   * What a prep station prints, in one line: the categories sent to it from the
+   * categories screen, then whatever its own list adds from the ones left automatic.
+   */
+  const stationSummary = (p: Printer): string => {
+    const chosen = categories.filter(c => c.printer_id === p.printer_id).map(c => c.name)
+    const automatic = categories.filter(c => c.printer_id == null).length
+    const ownList = !!p.category_ids && p.category_ids !== '[]'
+    const rest = automatic === 0 ? ''
+      : ownList ? 'أقسام محددة'
+      : chosen.length ? 'باقي الأقسام التلقائية' : 'كل الأقسام'
+    if (!chosen.length) return rest || 'لا أقسام'
+    return `${chosen.join('، ')}${rest ? ` + ${rest}` : ''}`
+  }
+
+  /** The printer a category was sent to on the categories screen, if any. */
+  const chosenPrinterName = (c: Category): string | null => {
+    if (c.printer_id === 0) return 'الكاشير فقط'
+    if (c.printer_id == null) return null
+    return printers.find(p => p.printer_id === c.printer_id)?.name ?? 'طابعة محذوفة'
+  }
+
   const isNetwork = draft?.connection === 'network'
   const isStation = isStationRole(draft?.role)
 
@@ -349,10 +371,8 @@ export default function PrinterSettings({ settings, update, showToast }: Props) 
                     <td>
                       <span>{role.icon} {role.label}</span>
                       {isStationRole(p.role) && (
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          {p.category_ids && p.category_ids !== '[]'
-                            ? 'أقسام محددة'
-                            : 'كل الأقسام'}
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', maxWidth: 260 }}>
+                          {stationSummary(p)}
                         </div>
                       )}
                     </td>
@@ -450,9 +470,23 @@ export default function PrinterSettings({ settings, update, showToast }: Props) 
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
                   اترك الكل بدون تحديد لتطبع كل الأصناف. إذا حددت أقساماً فلن تخرج تذكرة
                   أصلاً للطلبات التي لا تحتوي على أي صنف منها.
+                  {' '}الأقسام المعلَّمة 🔒 اختيرت طابعتها من <b>شاشة الأقسام</b> وتُغيَّر من هناك.
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {categories.map(c => {
+                    const fixedTo = chosenPrinterName(c)
+                    if (fixedTo) {
+                      const here = c.printer_id === draft.printerId
+                      return (
+                        <button
+                          key={c.category_id} type="button" disabled
+                          className={here ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-secondary'}
+                          title="اختيرت طابعة هذا القسم من شاشة الأقسام"
+                        >
+                          🔒 {c.name} {here ? '' : `← ${fixedTo}`}
+                        </button>
+                      )
+                    }
                     const on = draft.categoryIds.includes(c.category_id)
                     return (
                       <button

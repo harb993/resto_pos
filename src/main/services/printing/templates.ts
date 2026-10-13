@@ -24,6 +24,8 @@ export interface TicketItem {
   unitPrice: number
   categoryId?: number | null
   categoryName?: string | null
+  /** The category's chosen prep printer — see Category.printer_id. */
+  categoryPrinterId?: number | null
 }
 
 export interface TicketOrder {

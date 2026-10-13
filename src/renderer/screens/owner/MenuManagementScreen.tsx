@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from 'react'
-import type { MenuItem, Category, MenuItemInput, RawMaterial } from '../../../shared/types'
+import type { MenuItem, Category, MenuItemInput, RawMaterial, Printer, PrinterRole } from '../../../shared/types'
 import NumberInput from '../../components/NumberInput'
 import DeleteEntityModal from '../../components/DeleteEntityModal'
 import VariantEditor from './VariantEditor'
 import { useSettingsStore } from '../../state/stores'
 import type { DeletableKind } from '../../../shared/types'
+
+/** The printers that print a prep ticket — the only ones a category can be sent to. */
+const PREP_ROLES: PrinterRole[] = ['kitchen', 'bar', 'counter']
+
+/** The add / edit category form. `printerId`: null automatic, 0 no prep ticket. */
+interface CategoryDraft {
+  categoryId?: number
+  name: string
+  displayOrder: number
+  printerId: number | null
+}
 
 /** One editable ingredient row in the recipe modal. */
 interface RecipeDraftLine {
@@ -17,10 +28,10 @@ export default function MenuManagementScreen() {
   const [items, setItems] = useState<MenuItem[]>([])
   const [materials, setMaterials] = useState<RawMaterial[]>([])
   const [showModal, setShowModal] = useState(false)
-  const [showCatModal, setShowCatModal] = useState(false)
+  const [catDraft, setCatDraft] = useState<CategoryDraft | null>(null)
+  const [printers, setPrinters] = useState<Printer[]>([])
   const [editItem, setEditItem] = useState<MenuItem | null>(null)
   const [form, setForm] = useState<Partial<MenuItemInput>>({})
-  const [catName, setCatName] = useState('')
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null)
 
   // Loading the costed menu from «ملخص الريسبى». Shown before it runs, because the
@@ -48,14 +59,31 @@ export default function MenuManagementScreen() {
   useEffect(() => { loadData() }, [])
 
   const loadData = async () => {
-    const [c, m, rm] = await Promise.all([
+    const [c, m, rm, p] = await Promise.all([
       window.api.listCategories(),
       window.api.getMenu(true),
       window.api.listRawMaterials(),
+      window.api.listPrinters(),
     ])
     if (c.success) setCategories(c.data)
     if (m.success) setItems(m.data)
     if (rm.success) setMaterials(rm.data)
+    if (p.success) setPrinters(p.data)
+  }
+
+  const prepPrinters = printers.filter(p => PREP_ROLES.includes(p.role))
+
+  /** Where a category's items are printed, in the words on the chip. */
+  const printerLabel = (c: Category): { text: string; warn?: boolean } => {
+    if (c.printer_id === 0) return { text: '🧾 الكاشير فقط — بدون تذكرة تحضير' }
+    if (c.printer_id != null) {
+      const p = printers.find(x => x.printer_id === c.printer_id)
+      if (!p) return { text: '🖨️ طابعة غير موجودة', warn: true }
+      return p.is_active
+        ? { text: `🖨️ يطبع في: ${p.name}` }
+        : { text: `🖨️ ${p.name} (موقوفة — لن تخرج تذكرة)`, warn: true }
+    }
+    return { text: '🖨️ تلقائي — حسب إعدادات الطابعات' }
   }
 
   const openRecipe = async (item: MenuItem) => {
@@ -140,12 +168,28 @@ export default function MenuManagementScreen() {
     }
   }
 
-  const addCategory = async () => {
-    if (!catName.trim()) return
-    const res = await window.api.upsertCategory({ name: catName.trim(), displayOrder: categories.length + 1 })
+  const openAddCategory = () =>
+    setCatDraft({ name: '', displayOrder: categories.length + 1, printerId: null })
+
+  const openEditCategory = (c: Category) =>
+    setCatDraft({
+      categoryId: c.category_id, name: c.name, displayOrder: c.display_order,
+      printerId: c.printer_id ?? null,
+    })
+
+  const saveCategory = async () => {
+    if (!catDraft || !catDraft.name.trim()) return
+    const res = await window.api.upsertCategory({
+      categoryId: catDraft.categoryId,
+      name: catDraft.name.trim(),
+      displayOrder: catDraft.displayOrder,
+      printerId: catDraft.printerId,
+    })
     if (res.success) {
-      setCatName(''); setShowCatModal(false); loadData()
-      showToastMsg('تمت إضافة القسم الجديد')
+      showToastMsg(catDraft.categoryId ? 'تم تحديث القسم' : 'تمت إضافة القسم الجديد')
+      setCatDraft(null); loadData()
+    } else {
+      showToastMsg(res.error || 'تعذر حفظ القسم', 'error')
     }
   }
 
@@ -189,7 +233,7 @@ export default function MenuManagementScreen() {
           <button className="btn btn-ghost" onClick={openCatalog} title="القائمة المسعّرة من ملف ملخص الريسبى">
             📥 استيراد القائمة الجاهزة
           </button>
-          <button className="btn btn-secondary" onClick={() => setShowCatModal(true)}>
+          <button className="btn btn-secondary" onClick={openAddCategory}>
             + إضافة قسم جديد 📂
           </button>
           <button className="btn btn-primary" onClick={openAddItem}>
@@ -208,6 +252,8 @@ export default function MenuManagementScreen() {
           اضبط <b>اختيارات القسم</b> مرة واحدة وتنطبق على كل أصنافه — الحالية والتي
           تضيفها لاحقاً. قسم الدجاج يسأل "عادي / حار"، قسم البرجر يسأل "سنجل / دبل /
           تريبل"، وقسم المشروبات بلا اختيارات فتُضاف المياه والكولا بضغطة واحدة.
+          {' '}ومن <b>✏️ تعديل</b> تختار <b>الطابعة</b> التي تخرج عليها تذكرة تحضير أصناف
+          القسم — فاتورة العميل تخرج على طابعة الكاشير مع كل طلب في كل الأحوال.
         </p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           {categories.map(c => {
@@ -236,7 +282,18 @@ export default function MenuManagementScreen() {
                   <div style={{ fontSize: 11, color: groupNames.length ? 'var(--accent)' : 'var(--text-muted)', marginTop: 2 }}>
                     {groupNames.length ? `يسأل: ${groupNames.join(' + ')}` : 'بدون اختيارات — إضافة بضغطة واحدة'}
                   </div>
+                  {(() => {
+                    const where = printerLabel(c)
+                    return (
+                      <div style={{ fontSize: 11, marginTop: 2, color: where.warn ? 'var(--danger)' : 'var(--text-muted)' }}>
+                        {where.text}
+                      </div>
+                    )
+                  })()}
                 </span>
+                <button className="btn btn-secondary btn-sm" onClick={() => openEditCategory(c)}>
+                  ✏️ تعديل
+                </button>
                 <button
                   className="btn btn-secondary btn-sm"
                   onClick={() => setVariantCategory({
@@ -596,18 +653,60 @@ export default function MenuManagementScreen() {
         />
       )}
 
-      {/* Add Category Modal */}
-      {showCatModal && (
-        <div className="modal-overlay" onClick={() => setShowCatModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
-            <h2 className="modal-title">إضافة قسم جديد للقائمة</h2>
+      {/* Add / edit category — its name and the printer its prep tickets come out of */}
+      {catDraft && (
+        <div className="modal-overlay" onClick={() => setCatDraft(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
+            <h2 className="modal-title">{catDraft.categoryId ? 'تعديل القسم' : 'إضافة قسم جديد للقائمة'}</h2>
             <div className="form-group">
               <label className="form-label">اسم القسم</label>
-              <input className="input" value={catName} onChange={(e) => setCatName(e.target.value)} placeholder="مثال: العروض الخاصة، الحلويات، الإضافات..." autoFocus />
+              <input
+                className="input" value={catDraft.name} autoFocus
+                onChange={(e) => setCatDraft({ ...catDraft, name: e.target.value })}
+                placeholder="مثال: العروض الخاصة، الحلويات، الإضافات..."
+              />
             </div>
+
+            <div className="form-group">
+              <label className="form-label">🖨️ تطبع أصناف هذا القسم على</label>
+              <select
+                className="input"
+                value={catDraft.printerId === null ? '' : String(catDraft.printerId)}
+                onChange={(e) => setCatDraft({
+                  ...catDraft,
+                  printerId: e.target.value === '' ? null : Number(e.target.value),
+                })}
+              >
+                <option value="">تلقائي — حسب إعدادات الطابعات</option>
+                {prepPrinters.map(p => (
+                  <option key={p.printer_id} value={p.printer_id}>
+                    {p.name}{p.is_active ? '' : ' (موقوفة)'}
+                  </option>
+                ))}
+                {/* A printer since deleted must not make the form lie about what is saved. */}
+                {catDraft.printerId != null && catDraft.printerId !== 0 &&
+                  !prepPrinters.some(p => p.printer_id === catDraft.printerId) && (
+                  <option value={catDraft.printerId}>طابعة غير موجودة</option>
+                )}
+                <option value="0">بدون تذكرة تحضير (الكاشير فقط)</option>
+              </select>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.8 }}>
+                كل صنف من هذا القسم يُطلب تخرج تذكرته على هذه الطابعة وحدها، بدون أسعار.
+                فاتورة العميل بالأسعار تخرج على طابعة الكاشير مع كل طلب في كل الأحوال.
+                {' '}اختر «بدون تذكرة تحضير» لما يسلّمه الكاشير بنفسه مثل المشروبات.
+                {prepPrinters.length === 0 && (
+                  <b style={{ display: 'block', color: 'var(--warning, #b45309)' }}>
+                    لا توجد طابعات مطبخ بعد — أضفها من الإعدادات ← الطابعات بوظيفة «المطبخ».
+                  </b>
+                )}
+              </div>
+            </div>
+
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
-              <button className="btn btn-secondary" onClick={() => setShowCatModal(false)}>إلغاء</button>
-              <button className="btn btn-primary" onClick={addCategory}>إضافة القسم</button>
+              <button className="btn btn-secondary" onClick={() => setCatDraft(null)}>إلغاء</button>
+              <button className="btn btn-primary" onClick={saveCategory} disabled={!catDraft.name.trim()}>
+                {catDraft.categoryId ? 'حفظ القسم' : 'إضافة القسم'}
+              </button>
             </div>
           </div>
         </div>

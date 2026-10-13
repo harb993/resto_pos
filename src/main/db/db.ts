@@ -1101,6 +1101,15 @@ export function runMigrations(database: Database.Database = db): void {
     database.exec(`ALTER TABLE printers ADD COLUMN beep INTEGER NOT NULL DEFAULT 0;`)
   }
 
+  // categories.printer_id — the prep printer a category prints on, picked on the
+  // categories screen. Existing categories come in as NULL, which keeps routing exactly
+  // as the printers' own category lists already had it.
+  const catPrinterCols = columnsOf('categories')
+  if (catPrinterCols && !catPrinterCols.includes('printer_id')) {
+    log.info('[DB] Running migration: adding printer_id to categories')
+    database.exec(`ALTER TABLE categories ADD COLUMN printer_id INTEGER;`)
+  }
+
   // worker_attendance.shift_number — the shift actually worked that day
   const attCols = columnsOf('worker_attendance')
   if (attCols && !attCols.includes('shift_number')) {
@@ -1514,7 +1523,8 @@ function getEmbeddedSchema(): string {
       created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
     );
     CREATE TABLE IF NOT EXISTS categories (
-      category_id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, display_order INTEGER NOT NULL DEFAULT 0
+      category_id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, display_order INTEGER NOT NULL DEFAULT 0,
+      printer_id INTEGER
     );
     CREATE TABLE IF NOT EXISTS menu_items (
       item_id INTEGER PRIMARY KEY AUTOINCREMENT, category_id INTEGER NOT NULL REFERENCES categories(category_id),

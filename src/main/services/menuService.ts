@@ -10,20 +10,48 @@ export function listCategories(): Category[] {
   return db.prepare('SELECT * FROM categories ORDER BY display_order, name').all() as Category[]
 }
 
-export function upsertCategory(name: string, displayOrder: number, categoryId?: number): Category {
+/**
+ * `printerId` is the prep printer the category's items are sent to — see
+ * Category.printer_id. Left undefined it is not touched, so renaming a category from
+ * anywhere that does not know about printers keeps the choice already made.
+ */
+export function upsertCategory(
+  name: string,
+  displayOrder: number,
+  categoryId?: number,
+  printerId?: number | null,
+): Category {
   const db = getDb()
+  if (!name?.trim()) throw new Error('اسم القسم مطلوب')
+  name = name.trim()
+  if (printerId !== undefined) checkCategoryPrinter(printerId)
 
   if (categoryId) {
     db.prepare('UPDATE categories SET name = ?, display_order = ? WHERE category_id = ?')
       .run(name, displayOrder, categoryId)
-    log.info(`[Menu] Category updated: ${name} (id: ${categoryId})`)
+    if (printerId !== undefined) {
+      db.prepare('UPDATE categories SET printer_id = ? WHERE category_id = ?').run(printerId, categoryId)
+    }
+    log.info(`[Menu] Category updated: ${name} (id: ${categoryId}, printer: ${printerId ?? 'unchanged/auto'})`)
     return db.prepare('SELECT * FROM categories WHERE category_id = ?').get(categoryId) as Category
   } else {
-    const result = db.prepare('INSERT INTO categories (name, display_order) VALUES (?, ?)')
-      .run(name, displayOrder)
+    const result = db.prepare('INSERT INTO categories (name, display_order, printer_id) VALUES (?, ?, ?)')
+      .run(name, displayOrder, printerId ?? null)
     const newId = result.lastInsertRowid as number
-    log.info(`[Menu] Category created: ${name} (id: ${newId})`)
+    log.info(`[Menu] Category created: ${name} (id: ${newId}, printer: ${printerId ?? 'auto'})`)
     return db.prepare('SELECT * FROM categories WHERE category_id = ?').get(newId) as Category
+  }
+}
+
+/** NULL (automatic), 0 (no prep ticket), or a printer that actually prints prep tickets. */
+function checkCategoryPrinter(printerId: number | null): void {
+  if (printerId === null || printerId === 0) return
+  const printer = getDb().prepare('SELECT role FROM printers WHERE printer_id = ?').get(printerId) as
+    | { role: string }
+    | undefined
+  if (!printer) throw new Error('الطابعة المختارة غير موجودة')
+  if (!['kitchen', 'bar', 'counter'].includes(printer.role)) {
+    throw new Error('اختر طابعة تحضير (مطبخ / مشروبات) — طابعة الكاشير تطبع كل الطلب أصلاً')
   }
 }
 
