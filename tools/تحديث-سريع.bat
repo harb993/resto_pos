@@ -22,14 +22,14 @@ set "TARGET=%~1"
 if "%TARGET%"=="" (
   echo اسحب مجلد البرنامج والقه على هذا الملف،
   echo او اكتب مساره الان ثم اضغط Enter:
-  echo    مثال: C:\Users\Admin\Desktop\crispo
+  echo    مثال: C:\Users\Admin\Desktop\aboeldahab
   echo.
   set /p TARGET=المسار:
 )
 
-if not exist "%TARGET%\Crispo.exe" (
+if not exist "%TARGET%\AboElDahab.exe" (
   echo.
-  echo [خطأ] لم اجد Crispo.exe في:
+  echo [خطأ] لم اجد AboElDahab.exe في:
   echo        %TARGET%
   echo.
   pause
@@ -58,7 +58,7 @@ echo    المجلد: %TARGET%
 echo.
 
 echo [1/3] اغلاق البرنامج ...
-taskkill /IM Crispo.exe /F >nul 2>&1
+taskkill /IM AboElDahab.exe /F >nul 2>&1
 timeout /t 3 /nobreak >nul
 
 for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set DT=%%I
@@ -86,7 +86,7 @@ if errorlevel 1 (
 
 echo.
 echo ============================================
-echo    تم التحديث — شغّل Crispo.exe
+echo    تم التحديث — شغّل AboElDahab.exe
 echo ============================================
 echo.
 echo  للرجوع للنسخة القديمة اذا لزم:

@@ -246,9 +246,9 @@ export const useUIStore = create<UIState>((set) => ({
 export const SETTINGS_DEFAULTS: AppSettings = {
   tax_rate: 0.14,
   currency_symbol: 'ج.م',
-  business_name: 'Crispo Fried Chicken',
-  business_address: '',
-  business_phone: '',
+  business_name: 'أبو الدهب',
+  business_address: 'الساحل الشمالي - زاوية العوامة - بجوار ماركت أبو ربيع',
+  business_phone: '01063033386',
   receipt_footer: '',
   max_cashier_discount: 10,
   backup_folder: '',

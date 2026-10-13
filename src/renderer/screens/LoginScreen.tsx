@@ -37,7 +37,7 @@ export default function LoginScreen() {
     <div className="login-container" dir="rtl">
       <div className="login-card animate-slide">
         <div className="login-logo">
-          <img src={logoUrl} alt="Crispo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          <img src={logoUrl} alt="أبو الدهب" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
         <h1 className="login-title">{businessName}</h1>
         <p className="login-subtitle">نظام المبيعات والإدارة</p>

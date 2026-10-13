@@ -33,14 +33,14 @@ $target = if ($args.Count -gt 0 -and $args[0]) { $args[0] } else { $null }
 if (-not $target) {
     Line 'اسحب مجلد البرنامج وألقِه على UPDATE.bat،'
     Line 'أو اكتب مساره الآن ثم اضغط Enter:'
-    Line '   مثال: C:\Users\Admin\Desktop\crispo'
+    Line '   مثال: C:\Users\Admin\Desktop\aboeldahab'
     Line ''
     $target = Read-Host 'المسار'
 }
 
 $target = $target.Trim('"').Trim()
-if (-not (Test-Path (Join-Path $target 'Crispo.exe'))) {
-    Fail "لم أجد Crispo.exe في:`n        $target`n       تأكد أنك اخترت مجلد البرنامج الصحيح."
+if (-not (Test-Path (Join-Path $target 'AboElDahab.exe'))) {
+    Fail "لم أجد AboElDahab.exe في:`n        $target`n       تأكد أنك اخترت مجلد البرنامج الصحيح."
 }
 $targetAsar = Join-Path $target 'resources\app.asar'
 if (-not (Test-Path $targetAsar)) {
@@ -52,9 +52,9 @@ Line ''
 
 # ---- 1. إغلاق البرنامج ----
 Line '[1/3] إغلاق البرنامج ...'
-Get-Process -Name 'Crispo' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process -Name 'AboElDahab' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 3
-if (Get-Process -Name 'Crispo' -ErrorAction SilentlyContinue) {
+if (Get-Process -Name 'AboElDahab' -ErrorAction SilentlyContinue) {
     Fail 'البرنامج ما زال مفتوحاً — أغلقه يدوياً ثم أعد المحاولة.'
 }
 
@@ -89,7 +89,7 @@ if ($sizeMb -lt 10) {
 
 Line ''
 Line '============================================'
-Line '   تم التحديث — شغّل Crispo.exe'
+Line '   تم التحديث — شغّل AboElDahab.exe'
 Line '============================================'
 Line ''
 Line "   البيانات لم تُمس. النسخة القديمة محفوظة باسم:"

@@ -38,6 +38,8 @@ beforeAll(() => {
   initDatabase()
   const db = getDb()
   ownerId = (db.prepare(`SELECT user_id FROM users WHERE role='owner'`).get() as any).user_id
+  // A new database has no delivery areas of its own any more — give the test one.
+  db.prepare(`INSERT INTO delivery_areas (area_name, delivery_fee) SELECT 'منطقة الاختبار', 20 WHERE NOT EXISTS (SELECT 1 FROM delivery_areas WHERE is_active = 1)`).run()
   areaId = (db.prepare(`SELECT delivery_area_id FROM delivery_areas LIMIT 1`).get() as any).delivery_area_id
   const meal = db.prepare(`SELECT item_id, category_id FROM menu_items ORDER BY item_id LIMIT 1`).get() as any
   mealId = meal.item_id
@@ -55,6 +57,9 @@ beforeAll(() => {
   const group = db.prepare(`INSERT INTO item_variant_groups (category_id, group_name) VALUES (?, 'النوع')`)
     .run(meal.category_id).lastInsertRowid
   db.prepare(`INSERT INTO item_variant_options (variant_group_id, option_name, price_delta) VALUES (?, 'حار', 5)`).run(group)
+  // A new database comes with the shop's starter printers; this shop has just the one.
+  db.prepare('UPDATE categories SET printer_id = NULL').run()
+  db.prepare('DELETE FROM printers').run()
   db.prepare(`
     INSERT INTO printers (name, role, connection, host, port, category_ids)
     VALUES ('المطبخ', 'kitchen', 'network', '192.168.1.50', 9100, ?)

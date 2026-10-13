@@ -119,6 +119,8 @@ describe('createOrder — the main process owns every number', () => {
 
   it('takes the delivery fee from the area record, not the client', () => {
     const db = getDb()
+    // A new database has no delivery areas of its own any more — give the test one.
+    db.prepare(`INSERT INTO delivery_areas (area_name, delivery_fee) SELECT 'منطقة الاختبار', 20 WHERE NOT EXISTS (SELECT 1 FROM delivery_areas WHERE is_active = 1)`).run()
     const area = db.prepare('SELECT * FROM delivery_areas WHERE is_active = 1 LIMIT 1').get() as any
 
     const r = createOrder(order({

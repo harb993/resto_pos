@@ -71,7 +71,7 @@ function createWindow(): void {
     height: 800,
     minWidth: 1024,
     minHeight: 700,
-    title: 'Resto POS',
+    title: 'أبو الدهب',
     icon: resolvedIcon,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),

@@ -7,6 +7,7 @@ import { app } from 'electron'
 import log from 'electron-log/main'
 // Statically imported so the bundler resolves it; it does nothing unless --demo is set.
 import { seedDemoData } from './demoSeed'
+import { STARTER_MENU, STARTER_PRINTERS, CASHIER_ONLY } from './starterShop'
 
 let db: Database.Database
 
@@ -253,107 +254,44 @@ export function initDatabase(): Database.Database {
 
   seedFixedUsers()
 
+  // The shop's printers, then its starter menu — in that order, because every starter
+  // category names the printer its prep tickets go to. See starterShop.ts.
+  seedStarterPrinters()
+
   // Seed default categories & menu items if none exist.
   //
   // An emptied system must stay empty: once the starter menu has been dealt with —
   // either seeded here or deliberately cleared — this marker stops it coming back on
   // the next launch and quietly refilling a menu somebody has just emptied.
+  //
+  // No starter delivery areas and no starter stock: the shop's own delivery zones and
+  // its store room are things only the owner can type in.
   const catCount = db.prepare('SELECT COUNT(*) as count FROM categories').get() as { count: number }
   if (catCount.count === 0 && !starterContentHandled()) {
-    const insertCat = db.prepare('INSERT INTO categories (name, display_order) VALUES (?, ?)')
+    const insertCat = db.prepare('INSERT INTO categories (name, display_order, printer_id) VALUES (?, ?, ?)')
     const insertItem = db.prepare(
-      `INSERT INTO menu_items (category_id, name, price, cost_price, description, stock_quantity, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, 1)`
+      `INSERT INTO menu_items (category_id, name, price, cost_price, description, stock_quantity, is_active, display_order)
+       VALUES (?, ?, ?, 0, ?, 0, 1, ?)`
     )
+    const printerNamed = db.prepare('SELECT printer_id FROM printers WHERE name = ?')
 
-    const cats = [
-      {
-        name: 'وجبات الدجاج المقرمش',
-        order: 1,
-        items: [
-          { name: 'وجبة 4 قطع دجاج مقرمش', price: 135, cost: 60, desc: '4 قطع دجاج مقرمش + بطاطس + كول سلو + خبز', stock: 50 },
-          { name: 'وجبة التوفير العائلية (8 قطع)', price: 260, cost: 110, desc: '8 قطع دجاج + 2 بطاطس كبير + 2 كول سلو + 4 خبز', stock: 35 },
-          { name: 'باكت الحفلات واللمة (12 قطعة)', price: 375, cost: 165, desc: '12 قطعة دجاج + 3 بطاطس + 3 صوص + 6 خبز', stock: 25 },
-          { name: 'وجبة ستريبس دجاج (4 قطع)', price: 110, cost: 45, desc: '4 أصابع ستريبس مقرمشة + بطاطس + صوص هوني ماسترد', stock: 60 },
-        ]
-      },
-      {
-        name: 'البرجر والسندوتشات',
-        order: 2,
-        items: [
-          { name: 'ساندوتش زنجر سوبريم كلاسيك', price: 95, cost: 40, desc: 'صدر دجاج مقرمش + خس + مايونيز + خبز بريوش محمص', stock: 40 },
-          { name: 'برجر فاير سبايسي حار 🌶️', price: 105, cost: 45, desc: 'فيليه متبل حار + صوص باربكيو حار + جبنة شيدر + هالبينو', stock: 30 },
-          { name: 'دبل كرانش ستاك العملاق', price: 140, cost: 65, desc: 'قطعتين فيليه مقرمش + دبل جبنة + صوص تشيكن كينج الخاص', stock: 20 },
-          { name: 'تشيكن راب تورتيلا باربكيو', price: 85, cost: 35, desc: 'قطع ستريبس مقرمشة + بيف بيكون + صوص باربكيو مدخن', stock: 45 },
-        ]
-      },
-      {
-        name: 'المقبلات والبطاطس',
-        order: 3,
-        items: [
-          { name: 'بطاطس شيدر وهالبينو لوديد', price: 55, cost: 20, desc: 'بطاطس مقلية مغطاة بصلصة الجبنة الشيدر وشرائح الهالبينو', stock: 75 },
-          { name: 'حلقات بصل مقرمشة (8 قطع)', price: 40, cost: 15, desc: 'حلقات بصل ذهبية مقرمشة مع صوص الثومية الخاص', stock: 50 },
-          { name: 'سلطة كول سلو كلاسيك كبيرة', price: 30, cost: 10, desc: 'سلطة كرنب وجزر طازجة بالمايونيز وصوص العسل', stock: 80 },
-          { name: 'أصابع جبنة موزاريلا مقلية (4 قطع)', price: 60, cost: 25, desc: 'أصابع موزاريلا سايحة مع صوص المارينارا الإيطالي', stock: 40 },
-        ]
-      },
-      {
-        name: 'المشروبات والحلويات',
-        order: 4,
-        items: [
-          { name: 'بيبسي كانز 330 مل', price: 20, cost: 10, desc: 'مشروب غازي بارد منعش', stock: 120 },
-          { name: 'سفن آب كانز 330 مل', price: 20, cost: 10, desc: 'مشروب غازي ليمون منعش', stock: 100 },
-          { name: 'عصير برتقال فريش طازج', price: 35, cost: 15, desc: 'عصير برتقال طبيعي 100% بدون سكر مضاف', stock: 40 },
-          { name: 'مولتن تشوكلت لافا كيك', price: 65, cost: 25, desc: 'كيك الشوكولاتة الساخن مع صوص الشوكولاتة الذائب', stock: 25 },
-        ]
-      }
-    ]
-
-    for (const cat of cats) {
-      const res = insertCat.run(cat.name, cat.order)
-      const catId = res.lastInsertRowid as number
-      for (const it of cat.items) {
-        insertItem.run(catId, it.name, it.price, it.cost, it.desc, it.stock)
-      }
-    }
+    let items = 0
+    STARTER_MENU.forEach((cat, c) => {
+      // A printer the owner has since renamed or removed leaves the category automatic
+      // rather than pointing at nothing.
+      const printerId = cat.printer === CASHIER_ONLY
+        ? 0
+        : ((printerNamed.get(cat.printer) as { printer_id: number } | undefined)?.printer_id ?? null)
+      const catId = insertCat.run(cat.name, c + 1, printerId).lastInsertRowid as number
+      cat.items.forEach((it, i) => {
+        insertItem.run(catId, it.name, it.price, it.description ?? null, i + 1)
+        items++
+      })
+    })
 
     markStarterContentHandled()
-    log.info('[DB] Seeded initial Arabic categories and menu items with stock')
+    log.info(`[DB] Seeded the starter menu: ${STARTER_MENU.length} categories, ${items} items`)
   }
-
-  // Seed the example delivery areas — ONCE, on a database that has never had any.
-  //
-  // "If the table is empty" was not the same question, and the difference deleted a
-  // shop's work: the owner removed the areas they do not deliver to, restarted, and
-  // every one of them was back, fees and all. Cairo districts this restaurant has
-  // never heard of, reappearing on the counter screen after being deleted by hand.
-  // Observed here — الدقي came back twice.
-  //
-  // Its own marker rather than the menu's: they are set at different moments during a
-  // first run, and sharing one made whichever ran second think it had already had its
-  // turn. The flag is written even when nothing is seeded, so a shop that already has
-  // areas is equally protected the first time it starts on this build.
-  if (!deliveryAreasHandled()) {
-    const areaCount = db.prepare('SELECT COUNT(*) as count FROM delivery_areas').get() as { count: number }
-    if (areaCount.count === 0) {
-      const insertArea = db.prepare('INSERT INTO delivery_areas (area_name, delivery_fee) VALUES (?, ?)')
-      const areas = [
-        { name: 'وسط البلد', fee: 15 },
-        { name: 'المعادي', fee: 25 },
-        { name: 'مدينة نصر', fee: 20 },
-        { name: 'المهندسين', fee: 30 },
-        { name: 'الدقي', fee: 25 },
-        { name: 'حلوان', fee: 35 },
-      ]
-      for (const a of areas) {
-        insertArea.run(a.name, a.fee)
-      }
-      log.info('[DB] Seeded default delivery areas')
-    }
-    markDeliveryAreasHandled()
-  }
-
-  seedRawMaterials()
 
   // Only ever touches the demo database — see isDemoMode().
   if (isDemoMode()) {
@@ -423,150 +361,32 @@ function seedFixedUsers(): void {
   if (created > 0) log.info(`[DB] Created ${created} of the four fixed system accounts`)
 }
 
+/** Settings key recording that the starter printers have had their one turn. */
+const STARTER_PRINTERS_KEY = 'starter_printers_handled'
+
 /**
- * Seed a starter raw-material list, the whole-chicken → pieces prep conversion, and
- * recipes for the seeded menu items. Only runs on a database with no raw materials
- * yet, so it never overwrites a real inventory the owner has built up.
+ * The shop's three printers, on a database that has never had any — see starterShop.ts.
+ *
+ * Switched off and with no Windows printer chosen, so a sale before they are set up
+ * shows its invoice on screen rather than failing on three printers at once. Once, like
+ * the menu: a printer the owner deletes does not come back on the next launch.
  */
-function seedRawMaterials(): void {
-  const count = db.prepare('SELECT COUNT(*) as count FROM raw_materials').get() as { count: number }
-  if (count.count > 0) return
-  if (starterContentHandled()) return // emptied on purpose — do not refill it
+function seedStarterPrinters(): void {
+  const handled = db.prepare('SELECT value FROM settings WHERE key = ?').get(STARTER_PRINTERS_KEY) as
+    | { value: string }
+    | undefined
+  if (handled?.value === '1') return
 
-  const insertMaterial = db.prepare(
-    `INSERT INTO raw_materials (name, unit, stock_quantity, cost_per_unit, low_stock_threshold)
-     VALUES (?, ?, ?, ?, ?)`
-  )
-
-  // [name, unit, opening stock, cost per unit, low-stock threshold]
-  const materials: [string, string, number, number, number][] = [
-    ['دجاج كامل', 'دجاجة', 40, 90, 10],
-    ['قطع دجاج جاهزة', 'قطعة', 0, 11.25, 24],
-    ['صدور دجاج (فيليه)', 'قطعة', 60, 22, 15],
-    ['أرز', 'كجم', 25, 30, 5],
-    ['بطاطس مجمدة', 'كجم', 30, 45, 6],
-    ['خبز برجر', 'رغيف', 120, 3.5, 30],
-    ['خبز عيش', 'رغيف', 150, 1.5, 40],
-    ['خبز تورتيلا', 'رغيف', 80, 4, 20],
-    ['زيت قلي', 'لتر', 40, 55, 8],
-    ['دقيق تغطية (بقسماط)', 'كجم', 20, 25, 5],
-    ['صوص باربكيو', 'لتر', 10, 70, 2],
-    ['صوص هوني ماسترد', 'لتر', 8, 75, 2],
-    ['صوص ثومية', 'لتر', 8, 60, 2],
-    ['مايونيز', 'لتر', 12, 65, 3],
-    ['جبنة شيدر', 'كجم', 8, 180, 2],
-    ['جبنة موزاريلا', 'كجم', 6, 190, 2],
-    ['كرنب (كول سلو)', 'كجم', 15, 12, 3],
-    ['خس', 'كجم', 10, 20, 2],
-    ['بصل', 'كجم', 15, 15, 3],
-    ['هالبينو', 'كجم', 4, 90, 1],
-    ['بيبسي كانز', 'كانز', 120, 10, 24],
-    ['سفن آب كانز', 'كانز', 100, 10, 24],
-    ['برتقال', 'كجم', 20, 18, 5],
-    ['كيك شوكولاتة', 'قطعة', 25, 25, 6],
-    // Packaging — consumed on every order, so it belongs in stock like any ingredient
-    ['علبة وجبة كرتون', 'علبة', 200, 4, 50],
-    ['علبة باكت كبير', 'علبة', 80, 7, 20],
-    ['كيس ورقي ساندوتش', 'كيس', 300, 1, 60],
-    ['كيس تيك أواي بلاستيك', 'كيس', 250, 1.5, 50],
-    ['علبة بطاطس', 'علبة', 200, 2, 50],
-    ['علبة صوص صغيرة', 'علبة', 400, 0.75, 80],
-    ['كوب مشروبات', 'كوب', 150, 2, 40],
-    ['مناديل', 'باكيت', 100, 3, 20],
-  ]
-
-  const ids: Record<string, number> = {}
-  for (const [name, unit, stock, cost, threshold] of materials) {
-    const res = insertMaterial.run(name, unit, stock, cost, threshold)
-    ids[name] = res.lastInsertRowid as number
+  const count = db.prepare('SELECT COUNT(*) AS c FROM printers').get() as { c: number }
+  if (count.c === 0) {
+    const insert = db.prepare(
+      `INSERT INTO printers (name, role, connection, open_drawer, is_active, display_order)
+       VALUES (?, ?, 'windows_raw', ?, 0, ?)`
+    )
+    STARTER_PRINTERS.forEach((p, i) => insert.run(p.name, p.role, p.openDrawer ? 1 : 0, i + 1))
+    log.info(`[DB] Seeded ${STARTER_PRINTERS.length} starter printers (switched off until set up)`)
   }
-
-  // The prep step the owner asked for: butchering 1 whole chicken yields 8 ready pieces.
-  db.prepare(
-    `INSERT INTO prep_conversions (source_material_id, output_material_id, yield_quantity)
-     VALUES (?, ?, ?)`
-  ).run(ids['دجاج كامل'], ids['قطع دجاج جاهزة'], 8)
-
-  // Recipes for the seeded menu items, keyed by menu item name.
-  const recipes: Record<string, [string, number][]> = {
-    'وجبة 4 قطع دجاج مقرمش': [
-      ['قطع دجاج جاهزة', 4], ['بطاطس مجمدة', 0.2], ['كرنب (كول سلو)', 0.1],
-      ['خبز عيش', 1], ['زيت قلي', 0.1], ['دقيق تغطية (بقسماط)', 0.15],
-      ['علبة وجبة كرتون', 1], ['مناديل', 0.1],
-    ],
-    'وجبة التوفير العائلية (8 قطع)': [
-      ['قطع دجاج جاهزة', 8], ['بطاطس مجمدة', 0.4], ['كرنب (كول سلو)', 0.2],
-      ['خبز عيش', 4], ['زيت قلي', 0.2], ['دقيق تغطية (بقسماط)', 0.3],
-      ['علبة باكت كبير', 1], ['مناديل', 0.2],
-    ],
-    'باكت الحفلات واللمة (12 قطعة)': [
-      ['قطع دجاج جاهزة', 12], ['بطاطس مجمدة', 0.6], ['صوص باربكيو', 0.09],
-      ['خبز عيش', 6], ['زيت قلي', 0.3], ['دقيق تغطية (بقسماط)', 0.45],
-      ['علبة باكت كبير', 1], ['علبة صوص صغيرة', 3], ['مناديل', 0.3],
-    ],
-    'وجبة ستريبس دجاج (4 قطع)': [
-      ['صدور دجاج (فيليه)', 1], ['بطاطس مجمدة', 0.2], ['صوص هوني ماسترد', 0.03],
-      ['زيت قلي', 0.08], ['دقيق تغطية (بقسماط)', 0.12],
-      ['علبة وجبة كرتون', 1], ['علبة صوص صغيرة', 1], ['مناديل', 0.1],
-    ],
-    'ساندوتش زنجر سوبريم كلاسيك': [
-      ['صدور دجاج (فيليه)', 1], ['خبز برجر', 1], ['خس', 0.03],
-      ['مايونيز', 0.02], ['زيت قلي', 0.05], ['دقيق تغطية (بقسماط)', 0.08],
-      ['كيس ورقي ساندوتش', 1],
-    ],
-    'برجر فاير سبايسي حار 🌶️': [
-      ['صدور دجاج (فيليه)', 1], ['خبز برجر', 1], ['جبنة شيدر', 0.02],
-      ['صوص باربكيو', 0.02], ['هالبينو', 0.02], ['زيت قلي', 0.05],
-      ['كيس ورقي ساندوتش', 1],
-    ],
-    'دبل كرانش ستاك العملاق': [
-      ['صدور دجاج (فيليه)', 2], ['خبز برجر', 1], ['جبنة شيدر', 0.04],
-      ['مايونيز', 0.03], ['زيت قلي', 0.1], ['دقيق تغطية (بقسماط)', 0.16],
-      ['كيس ورقي ساندوتش', 1],
-    ],
-    'تشيكن راب تورتيلا باربكيو': [
-      ['صدور دجاج (فيليه)', 1], ['خبز تورتيلا', 1], ['خس', 0.03],
-      ['صوص باربكيو', 0.02], ['زيت قلي', 0.05], ['كيس ورقي ساندوتش', 1],
-    ],
-    'بطاطس شيدر وهالبينو لوديد': [
-      ['بطاطس مجمدة', 0.3], ['جبنة شيدر', 0.05], ['هالبينو', 0.03], ['زيت قلي', 0.06],
-      ['علبة بطاطس', 1],
-    ],
-    'حلقات بصل مقرمشة (8 قطع)': [
-      ['بصل', 0.2], ['دقيق تغطية (بقسماط)', 0.08], ['صوص ثومية', 0.02], ['زيت قلي', 0.05],
-      ['علبة بطاطس', 1], ['علبة صوص صغيرة', 1],
-    ],
-    'سلطة كول سلو كلاسيك كبيرة': [
-      ['كرنب (كول سلو)', 0.2], ['مايونيز', 0.04], ['علبة بطاطس', 1],
-    ],
-    'أصابع جبنة موزاريلا مقلية (4 قطع)': [
-      ['جبنة موزاريلا', 0.12], ['دقيق تغطية (بقسماط)', 0.05], ['زيت قلي', 0.05],
-      ['علبة بطاطس', 1], ['علبة صوص صغيرة', 1],
-    ],
-    'بيبسي كانز 330 مل': [['بيبسي كانز', 1]],
-    'سفن آب كانز 330 مل': [['سفن آب كانز', 1]],
-    'عصير برتقال فريش طازج': [['برتقال', 0.5], ['كوب مشروبات', 1]],
-    'مولتن تشوكلت لافا كيك': [['كيك شوكولاتة', 1], ['علبة بطاطس', 1]],
-  }
-
-  const getItem = db.prepare('SELECT item_id FROM menu_items WHERE name = ?')
-  const insertRecipe = db.prepare(
-    `INSERT OR IGNORE INTO recipe_items (menu_item_id, raw_material_id, quantity) VALUES (?, ?, ?)`
-  )
-
-  let linked = 0
-  for (const [itemName, lines] of Object.entries(recipes)) {
-    const item = getItem.get(itemName) as { item_id: number } | undefined
-    if (!item) continue // menu was customised — skip rather than guess
-    for (const [materialName, qty] of lines) {
-      const materialId = ids[materialName]
-      if (materialId) insertRecipe.run(item.item_id, materialId, qty)
-    }
-    linked++
-  }
-
-  markStarterContentHandled()
-  log.info(`[DB] Seeded ${materials.length} raw materials, chicken prep conversion, and ${linked} recipes`)
+  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(STARTER_PRINTERS_KEY, '1')
 }
 
 /** Settings key recording that the starter menu and inventory have had their one turn. */
@@ -581,20 +401,6 @@ function starterContentHandled(database: Database.Database = db): boolean {
 function markStarterContentHandled(database: Database.Database = db): void {
   database.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
     .run(STARTER_CONTENT_KEY, '1')
-}
-
-/** The same, for the example delivery areas — see the seeder for why it is separate. */
-const DELIVERY_AREAS_KEY = 'starter_delivery_areas_handled'
-
-function deliveryAreasHandled(database: Database.Database = db): boolean {
-  const row = database.prepare('SELECT value FROM settings WHERE key = ?')
-    .get(DELIVERY_AREAS_KEY) as { value: string } | undefined
-  return row?.value === '1'
-}
-
-function markDeliveryAreasHandled(database: Database.Database = db): void {
-  database.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
-    .run(DELIVERY_AREAS_KEY, '1')
 }
 
 /**
@@ -731,9 +537,9 @@ const MIGRATION_PACKAGING = 1
 
 /**
  * Boxes, bags and napkins are consumed on every order, so they belong in stock like
- * any other ingredient — but they were missing from the original seed. Databases
- * created before this shipped skip seedRawMaterials() entirely (it only runs on an
- * empty table), so they need the packaging added separately.
+ * any other ingredient — but they were missing from the original seed, which only
+ * ever ran on an empty table. Databases created before this shipped need the packaging
+ * added separately.
  *
  * Recorded in schema_migrations so it runs exactly once ever: re-adding materials the
  * owner has since renamed or stopped using would be worse than not adding them.
@@ -751,8 +557,8 @@ function addPackagingMaterials(database: Database.Database): void {
     .get(MIGRATION_PACKAGING)
   if (applied) return
 
-  // A database with no materials at all is brand new — seedRawMaterials() will put
-  // the full list in, packaging included. Just record the migration as done.
+  // A database with no materials at all is brand new and starts with an empty store
+  // room. Just record the migration as done.
   const count = database.prepare('SELECT COUNT(*) as c FROM raw_materials').get() as { c: number }
 
   if (count.c > 0) {
@@ -1502,8 +1308,8 @@ function getEmbeddedSchema(): string {
     PRAGMA foreign_keys = ON;
     CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
     INSERT OR IGNORE INTO settings (key, value) VALUES
-      ('tax_rate', '0.14'), ('currency_symbol', 'ج.م'), ('business_name', 'Crispo Fried Chicken'),
-      ('business_address', ''), ('business_phone', ''),
+      ('tax_rate', '0.14'), ('currency_symbol', 'ج.م'), ('business_name', 'أبو الدهب'),
+      ('business_address', 'الساحل الشمالي - زاوية العوامة - بجوار ماركت أبو ربيع'), ('business_phone', '01063033386'),
       ('receipt_footer', 'شكراً لزيارتكم! بالهناء والشفاء ❤️'), ('max_cashier_discount', '10'), ('backup_folder', ''),
       ('invoice_seq', '0'), ('invoice_start', '1'),
       ('shifts_per_day', '2'),

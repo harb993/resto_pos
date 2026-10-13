@@ -170,7 +170,7 @@ function styleSalesSheet(sheet: any): void {
 export async function exportFinanceWorkbook(report: FinanceReport): Promise<string | null> {
   const ExcelJS = require('exceljs')
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'Crispo POS'
+  wb.creator = 'Abo El Dahab POS'
   wb.created = new Date()
 
   const MONEY = '#,##0.00'

@@ -78,15 +78,6 @@ export default function RawMaterialsScreen() {
   // Deleting a material — the modal checks what depends on it before offering anything.
   const [deletingMaterialId, setDeletingMaterialId] = useState<number | null>(null)
 
-  // Loading the dish recipes from «ملخص الريسبى». Shown as a preview first, because
-  // it creates materials and rewrites nothing without saying so.
-  const [recipeImport, setRecipeImport] = useState<{
-    materials: number; recipes: number; onMenu: number
-    missing: string[]; materialsNeedingCost: number
-  } | null>(null)
-  const [recipeReplace, setRecipeReplace] = useState(false)
-  const [recipeBusy, setRecipeBusy] = useState(false)
-
   // Movement history for one material
   const [historyFor, setHistoryFor] = useState<RawMaterial | null>(null)
   const [history, setHistory] = useState<RawMaterialTransaction[]>([])
@@ -95,35 +86,6 @@ export default function RawMaterialsScreen() {
   const showToast = (msg: string, type = 'success') => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 3500)
-  }
-
-  const openRecipeImport = async () => {
-    const res = await window.api.previewRecipeCatalog()
-    if (res.success) {
-      setRecipeReplace(false)
-      setRecipeImport(res.data)
-    } else {
-      showToast(res.error || 'تعذر قراءة المكونات', 'error')
-    }
-  }
-
-  const runRecipeImport = async () => {
-    setRecipeBusy(true)
-    const res = await window.api.importRecipeCatalog(recipeReplace)
-    setRecipeBusy(false)
-    if (!res.success) {
-      showToast(res.error || 'تعذر استيراد المكونات', 'error')
-      return
-    }
-    const d = res.data
-    setRecipeImport(null)
-    showToast(
-      `تم الاستيراد — ${d.materialsCreated} مادة جديدة، ` +
-      `${d.itemsLinked} صنف تم ربط مكوناته` +
-      (d.itemsAlreadyHadRecipe ? `، ${d.itemsAlreadyHadRecipe} صنف له مكونات بالفعل` : '') +
-      (d.itemsSkipped ? `، ${d.itemsSkipped} صنف غير موجود في القائمة` : '')
-    )
-    loadData()
   }
 
   const loadData = useCallback(async () => {
@@ -325,11 +287,6 @@ export default function RawMaterialsScreen() {
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn btn-secondary" onClick={loadData}>🔄 تحديث</button>
-          {canEdit && (
-            <button className="btn btn-secondary" onClick={openRecipeImport}>
-              🧾 استيراد مكونات الوجبات
-            </button>
-          )}
           {canEdit && (
             <button className="btn btn-primary" onClick={openCreate}>+ إضافة مادة خام</button>
           )}
@@ -726,81 +683,6 @@ export default function RawMaterialsScreen() {
           onClose={() => setDeletingMaterialId(null)}
           onDone={(msg) => { setDeletingMaterialId(null); showToast(msg); loadData() }}
         />
-      )}
-
-      {/* Loading the dish recipes — shown in full before anything is written */}
-      {recipeImport && (
-        <div className="modal-overlay" onClick={() => !recipeBusy && setRecipeImport(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
-            <h2 className="modal-title">🧾 استيراد مكونات الوجبات</h2>
-
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.9, marginBottom: 14 }}>
-              يربط كل صنف في القائمة بما يخرج من المخزن عند بيعه — قطع الفراخ والخبز
-              والبطاطس والصوصات والتغليف. بعدها كل فاتورة تُنقص المخزون تلقائياً،
-              ويظهر في التقرير المالي «الخامات المستهلكة».
-            </p>
-
-            <div style={{
-              background: 'var(--success-bg)', borderRight: '3px solid var(--success)',
-              borderRadius: 'var(--radius-sm)', padding: '10px 13px', marginBottom: 12, fontSize: 13, lineHeight: 1.9,
-            }}>
-              <b>{recipeImport.materials}</b> مادة خام · <b>{recipeImport.recipes}</b> وصفة
-              <br />
-              <b>{recipeImport.onMenu}</b> صنف منها موجود في قائمتك وسيتم ربطه.
-            </div>
-
-            {recipeImport.missing.length > 0 && (
-              <div style={{
-                background: 'var(--warning-bg)', borderRight: '3px solid var(--warning)',
-                borderRadius: 'var(--radius-sm)', padding: '10px 13px', marginBottom: 12, fontSize: 12.5, lineHeight: 1.8,
-              }}>
-                <b>{recipeImport.missing.length} صنف غير موجود في القائمة</b> وسيتم تخطيه —
-                {' '}استورد «القائمة الجاهزة» أولاً من شاشة قائمة الطعام إن أردت ربطها:
-                <div style={{ marginTop: 6, maxHeight: 70, overflowY: 'auto', opacity: 0.85 }}>
-                  {recipeImport.missing.slice(0, 12).join('، ')}
-                  {recipeImport.missing.length > 12 ? ' …' : ''}
-                </div>
-              </div>
-            )}
-
-            <div style={{
-              background: 'var(--warning-bg)', borderRight: '3px solid var(--warning)',
-              borderRadius: 'var(--radius-sm)', padding: '10px 13px', marginBottom: 14, fontSize: 12.5, lineHeight: 1.9,
-            }}>
-              <b>⚠️ الأسعار تبقى عليك.</b> ملف الريسبى يُسعّر الوجبة ولا يُسعّر المكوّن،
-              فتدخل المواد بتكلفة صفر. لن تتأثر أرباحك: يظل النظام يحسب تكلفة كل وجبة
-              من الرقم المُسعَّر في ملف الريسبى حتى تُدخل أسعار الموردين هنا.
-              {recipeImport.materialsNeedingCost > 0 && (
-                <> حالياً <b>{recipeImport.materialsNeedingCost}</b> مادة بدون سعر.</>
-              )}
-              <br />
-              الكميات الافتتاحية أيضاً لا تُستورد — الجرد عدٌّ يدوي.
-            </div>
-
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', marginBottom: 16, fontSize: 13 }}>
-              <input
-                type="checkbox" checked={recipeReplace} style={{ marginTop: 3 }}
-                onChange={e => setRecipeReplace(e.target.checked)}
-              />
-              <span>
-                استبدال المكونات الموجودة
-                <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.7 }}>
-                  بدونها: أي صنف عرّفت مكوناته بنفسك يُترك كما هو. معها: تُمسح وتُستبدل
-                  {' '}بما في ملف الريسبى.
-                </span>
-              </span>
-            </label>
-
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button className="btn btn-secondary" onClick={() => setRecipeImport(null)} disabled={recipeBusy}>
-                إلغاء
-              </button>
-              <button className="btn btn-primary" onClick={runRecipeImport} disabled={recipeBusy || recipeImport.onMenu === 0}>
-                {recipeBusy ? 'جاري الاستيراد...' : 'استيراد المكونات'}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Define / edit a prep rule */}

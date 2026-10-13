@@ -4,11 +4,10 @@ import { initDatabase, closeDatabase, getDb } from '../src/main/db/db'
 /**
  * A deleted delivery area must stay deleted.
  *
- * The seeder asked "is this table empty?" and refilled it if so. That is not the same
- * question as "has this database ever been given the examples", and the difference
- * undid people's work: the owner removed the districts the shop does not deliver to,
- * restarted the till, and every one of them was back — names and fees — on the counter
- * screen. Reported from this restaurant about الدقي, which came back twice.
+ * An earlier seeder asked "is this table empty?" and refilled it if so, which undid
+ * people's work: the owner removed the districts the shop does not deliver to,
+ * restarted the till, and every one of them was back on the counter screen. There are
+ * no example areas now, and nothing may refill the list behind the owner's back.
  */
 
 const areas = () => getDb()
@@ -21,27 +20,34 @@ const restart = () => { closeDatabase(); initDatabase() }
 
 beforeAll(() => { initDatabase() })
 
-describe('the example areas', () => {
-  it('are given to a brand-new database once', () => {
-    expect(areas().length).toBeGreaterThan(0)
+const add = (name: string, fee: number) =>
+  getDb().prepare('INSERT INTO delivery_areas (area_name, delivery_fee) VALUES (?, ?)').run(name, fee)
+
+describe('a brand-new database', () => {
+  it('starts with no example areas — the shop types in its own', () => {
+    // It used to arrive with Cairo districts. أبو الدهب is on the North Coast; a list
+    // of places the shop has never delivered to is only something to delete.
+    expect(areas()).toEqual([])
   })
 
-  it('are not given again on the next launch', () => {
-    const first = areas()
+  it('stays empty across a restart', () => {
     restart()
-    expect(areas()).toEqual(first)
+    expect(areas()).toEqual([])
   })
 })
 
-describe('deleting one', () => {
-  it('keeps it gone across a restart', () => {
-    expect(areas()).toContain('الدقي')
-
-    getDb().prepare('DELETE FROM delivery_areas WHERE area_name = ?').run('الدقي')
-    expect(areas()).not.toContain('الدقي')
-
+describe('the areas the owner adds', () => {
+  it('survive a restart', () => {
+    add('زاوية العوامة', 10)
+    add('الحمام', 25)
     restart()
-    expect(areas(), 'الدقي must not come back').not.toContain('الدقي')
+    expect(areas()).toEqual(['الحمام', 'زاوية العوامة'])
+  })
+
+  it('stay gone once deleted', () => {
+    getDb().prepare('DELETE FROM delivery_areas WHERE area_name = ?').run('الحمام')
+    restart()
+    expect(areas(), 'a deleted area must not come back').toEqual(['زاوية العوامة'])
   })
 })
 

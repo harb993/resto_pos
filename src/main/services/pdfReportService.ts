@@ -99,7 +99,7 @@ function esc(s: unknown): string {
 
 function buildShiftHtml(r: ShiftReport, settings: any): string {
   const currency = settings.currency_symbol || 'ج.م'
-  const business = esc(settings.business_name || 'Crispo Fried Chicken')
+  const business = esc(settings.business_name || 'أبو الدهب')
   const printedAt = new Date().toLocaleString('ar-EG')
   // Follows the shop's CURRENT setup, not the number stamped on the row: a shop that
   // has switched to one shift a day has no «مسائية» to head a report with.
@@ -315,7 +315,7 @@ ${r.stockMoves.length ? `<div class="section">
 
 function buildReportHtml(r: FinanceReport, settings: any): string {
   const currency = settings.currency_symbol || 'ج.م'
-  const business = esc(settings.business_name || 'Crispo Fried Chicken')
+  const business = esc(settings.business_name || 'أبو الدهب')
   const printedAt = new Date().toLocaleString('ar-EG')
   const profitColor = r.netProfit >= 0 ? '#15803D' : '#D92D20'
 

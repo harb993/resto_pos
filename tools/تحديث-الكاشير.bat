@@ -5,7 +5,7 @@ setlocal enabledelayedexpansion
 rem ============================================================
 rem   تحديث برنامج كريسبو  —  يحافظ على بيانات المحل
 rem ------------------------------------------------------------
-rem   ضع هذا الملف بجوار مجلد البرنامج (المجلد الذي به Crispo.exe)
+rem   ضع هذا الملف بجوار مجلد البرنامج (المجلد الذي به AboElDahab.exe)
 rem   ثم شغّله. سيقوم بـ:
 rem     1. إغلاق البرنامج إن كان مفتوحاً
 rem     2. أخذ نسخة احتياطية من data و data-demo
@@ -29,9 +29,9 @@ if "%TARGET%"=="" (
   set /p TARGET=المسار:
 )
 
-if not exist "%TARGET%\Crispo.exe" (
+if not exist "%TARGET%\AboElDahab.exe" (
   echo.
-  echo [خطأ] لم اجد Crispo.exe في:
+  echo [خطأ] لم اجد AboElDahab.exe في:
   echo        %TARGET%
   echo تأكد انك اخترت مجلد البرنامج الصحيح.
   echo.
@@ -39,7 +39,7 @@ if not exist "%TARGET%\Crispo.exe" (
   exit /b 1
 )
 
-if not exist "%NEW%\Crispo.exe" (
+if not exist "%NEW%\AboElDahab.exe" (
   echo.
   echo [خطأ] مجلد app غير موجود بجوار هذا الملف.
   echo فك ضغط الملف بالكامل اولا ثم شغّل التحديث.
@@ -53,13 +53,13 @@ echo.
 
 rem ---- 1. اغلاق البرنامج ----
 echo [1/4] اغلاق البرنامج ...
-taskkill /IM Crispo.exe /F >nul 2>&1
+taskkill /IM AboElDahab.exe /F >nul 2>&1
 timeout /t 3 /nobreak >nul
 
 rem ---- 2. نسخة احتياطية ----
 for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set DT=%%I
 set "STAMP=%DT:~0,4%-%DT:~4,2%-%DT:~6,2%_%DT:~8,2%-%DT:~10,2%"
-set "BACKUP=%TARGET%\..\crispo_DATA_BACKUP_%STAMP%"
+set "BACKUP=%TARGET%\..\aboeldahab_DATA_BACKUP_%STAMP%"
 
 echo [2/4] نسخة احتياطية من البيانات ...
 mkdir "%BACKUP%" >nul 2>&1

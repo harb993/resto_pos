@@ -58,6 +58,8 @@ beforeAll(() => {
   const meal = db.prepare(`SELECT item_id, price FROM menu_items ORDER BY item_id LIMIT 1`).get() as any
   mealId = meal.item_id
   mealPrice = meal.price
+  // A new database has no delivery areas of its own any more — give the test one.
+  db.prepare(`INSERT INTO delivery_areas (area_name, delivery_fee) SELECT 'منطقة الاختبار', 20 WHERE NOT EXISTS (SELECT 1 FROM delivery_areas WHERE is_active = 1)`).run()
   areaId = (db.prepare(`SELECT delivery_area_id FROM delivery_areas ORDER BY delivery_area_id LIMIT 1`)
     .get() as any).delivery_area_id
 })

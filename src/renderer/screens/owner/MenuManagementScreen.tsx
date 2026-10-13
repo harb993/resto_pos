@@ -34,12 +34,6 @@ export default function MenuManagementScreen() {
   const [form, setForm] = useState<Partial<MenuItemInput>>({})
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null)
 
-  // Loading the costed menu from «ملخص الريسبى». Shown before it runs, because the
-  // owner should read what is about to be added rather than discover it afterwards.
-  const [catalog, setCatalog] = useState<{ name: string; items: number }[] | null>(null)
-  const [replacePrices, setReplacePrices] = useState(false)
-  const [importing, setImporting] = useState(false)
-
   // Deleting a category or an item — the modal works out what depends on it first.
   const [deleteTarget, setDeleteTarget] = useState<{ kind: DeletableKind; id: number } | null>(null)
 
@@ -193,34 +187,6 @@ export default function MenuManagementScreen() {
     }
   }
 
-  const openCatalog = async () => {
-    const res = await window.api.previewMenuCatalog()
-    if (res.success) {
-      setReplacePrices(false)
-      setCatalog(res.data)
-    } else {
-      showToastMsg(res.error || 'تعذر قراءة القائمة', 'error')
-    }
-  }
-
-  const runImport = async () => {
-    setImporting(true)
-    const res = await window.api.importMenuCatalog(replacePrices)
-    setImporting(false)
-    if (!res.success) { showToastMsg(res.error || 'فشل استيراد القائمة', 'error'); return }
-
-    const r = res.data
-    const parts: string[] = []
-    if (r.categoriesCreated) parts.push(`${r.categoriesCreated} قسم جديد`)
-    if (r.itemsCreated) parts.push(`${r.itemsCreated} صنف جديد`)
-    if (r.itemsUpdated) parts.push(`${r.itemsUpdated} صنف مُحدَّث`)
-    if (r.itemsUnchanged) parts.push(`${r.itemsUnchanged} صنف كما هو`)
-
-    setCatalog(null)
-    loadData()
-    showToastMsg(parts.length ? `تم استيراد القائمة — ${parts.join('، ')}` : 'القائمة محدّثة بالفعل')
-  }
-
   return (
     <div className="animate-fade" dir="rtl">
       {/* Header */}
@@ -230,14 +196,11 @@ export default function MenuManagementScreen() {
           <p className="page-subtitle">إجمالي {items.length} صنف مسجل عبر {categories.length} أقسام رئيسية</p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn btn-ghost" onClick={openCatalog} title="القائمة المسعّرة من ملف ملخص الريسبى">
-            📥 استيراد القائمة الجاهزة
-          </button>
           <button className="btn btn-secondary" onClick={openAddCategory}>
             + إضافة قسم جديد 📂
           </button>
           <button className="btn btn-primary" onClick={openAddItem}>
-            + إضافة وجبة جديدة 🍗
+            + إضافة وجبة جديدة 🍽️
           </button>
         </div>
       </div>
@@ -250,8 +213,8 @@ export default function MenuManagementScreen() {
         </div>
         <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.9 }}>
           اضبط <b>اختيارات القسم</b> مرة واحدة وتنطبق على كل أصنافه — الحالية والتي
-          تضيفها لاحقاً. قسم الدجاج يسأل "عادي / حار"، قسم البرجر يسأل "سنجل / دبل /
-          تريبل"، وقسم المشروبات بلا اختيارات فتُضاف المياه والكولا بضغطة واحدة.
+          تضيفها لاحقاً. قسم الشاورما مثلاً قد يسأل "عادي / حار"، وقسم المشروبات بلا
+          اختيارات فتُضاف المياه والكانز بضغطة واحدة.
           {' '}ومن <b>✏️ تعديل</b> تختار <b>الطابعة</b> التي تخرج عليها تذكرة تحضير أصناف
           القسم — فاتورة العميل تخرج على طابعة الكاشير مع كل طلب في كل الأحوال.
         </p>
@@ -439,7 +402,7 @@ export default function MenuManagementScreen() {
             
             <div className="form-group">
               <label className="form-label">اسم الوجبة</label>
-              <input className="input" placeholder="مثال: وجبة 4 قطع دجاج مقرمش" value={form.name || ''} onChange={(e) => setForm({ ...form, name: e.target.value })} autoFocus />
+              <input className="input" placeholder="مثال: كشري كبير / فتة شاورما فراخ" value={form.name || ''} onChange={(e) => setForm({ ...form, name: e.target.value })} autoFocus />
             </div>
 
             <div className="form-group">
@@ -493,7 +456,7 @@ export default function MenuManagementScreen() {
                 meals. What a meal consumes is set in «المكونات». */}
             <div className="form-group">
               <label className="form-label">الوصف (يظهر للكاشير)</label>
-              <input className="input" placeholder="مثال: 4 قطع دجاج + بطاطس + كول سلو + خبز" value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+              <input className="input" placeholder="مثال: شاورما + بطاطس + طحينة + مخلل" value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             </div>
 
             {editItem && (
@@ -706,71 +669,6 @@ export default function MenuManagementScreen() {
               <button className="btn btn-secondary" onClick={() => setCatDraft(null)}>إلغاء</button>
               <button className="btn btn-primary" onClick={saveCategory} disabled={!catDraft.name.trim()}>
                 {catDraft.categoryId ? 'حفظ القسم' : 'إضافة القسم'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {catalog && (
-        <div className="modal-overlay" onClick={() => !importing && setCatalog(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
-            <h2 className="modal-title">استيراد القائمة المسعّرة</h2>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.9, marginBottom: 14 }}>
-              القائمة الكاملة كما هي في ملف <b>«ملخص الريسبى»</b> — بسعر البيع
-              وبالتكلفة بعد هامش الأمان 5%. الأصناف الموجودة بالفعل تُطابَق بالاسم
-              فلا تتكرر، ولا يُحذف أي صنف.
-            </p>
-
-            <div className="table-container" style={{ maxHeight: 240, overflowY: 'auto', marginBottom: 14 }}>
-              <table>
-                <thead><tr><th>القسم</th><th style={{ textAlign: 'left' }}>عدد الأصناف</th></tr></thead>
-                <tbody>
-                  {catalog.map(c => (
-                    <tr key={c.name}>
-                      <td style={{ fontWeight: 700 }}>{c.name}</td>
-                      <td style={{ textAlign: 'left' }}>{c.items}</td>
-                    </tr>
-                  ))}
-                  <tr>
-                    <td style={{ fontWeight: 900 }}>الإجمالي</td>
-                    <td style={{ textAlign: 'left', fontWeight: 900 }}>
-                      {catalog.reduce((n, c) => n + c.items, 0)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', fontSize: 13, marginBottom: 6 }}>
-              <input
-                type="checkbox"
-                checked={replacePrices}
-                onChange={e => setReplacePrices(e.target.checked)}
-                style={{ marginTop: 3 }}
-              />
-              <span>
-                <b>تحديث أسعار وتكاليف الأصناف الموجودة</b>
-                <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 2 }}>
-                  بدونها تُضاف الأصناف الناقصة فقط، ويظل أي سعر عدّلته بنفسك كما هو.
-                </div>
-              </span>
-            </label>
-
-            <div style={{
-              background: 'var(--warning-bg)', borderRight: '3px solid var(--warning)',
-              borderRadius: 'var(--radius-sm)', padding: '10px 13px', fontSize: 12.5, margin: '10px 0 4px',
-            }}>
-              قسم «الإضافات» مسعّر في الملف لكن بدون تكلفة، فيدخل بتكلفة صفر —
-              اضبط تكلفته من شاشة الأصناف حتى تكون أرقام الأرباح صحيحة.
-            </div>
-
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>
-              <button className="btn btn-secondary" onClick={() => setCatalog(null)} disabled={importing}>
-                إلغاء
-              </button>
-              <button className="btn btn-primary" onClick={runImport} disabled={importing}>
-                {importing ? '⏳ جاري الاستيراد...' : '📥 استيراد القائمة'}
               </button>
             </div>
           </div>

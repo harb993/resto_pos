@@ -1,7 +1,7 @@
 {
   "name": "resto-pos",
   "version": "1.0.0",
-  "description": "Fried Chicken Restaurant POS & Management System",
+  "description": "Abo El Dahab — grills, shawarma & koshary — POS & Management System",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -41,8 +41,8 @@
     "vitest": "^1.6.0"
   },
   "build": {
-    "appId": "com.resto.pos",
-    "productName": "Crispo",
+    "appId": "com.aboeldahab.pos",
+    "productName": "AboElDahab",
     "asar": true,
     "asarUnpack": [
       "**/node_modules/better-sqlite3/**"

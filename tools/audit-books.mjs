@@ -2,7 +2,7 @@
 /**
  * Penny-level audit of a live restaurant database. READ-ONLY — it works on a copy.
  *
- *   node tools/audit-books.mjs "C:\\Users\\Admin\\Desktop\\crispo\\data\\restaurant.db"
+ *   node tools/audit-books.mjs "C:\\Users\\Admin\\Desktop\\aboeldahab\\data\\restaurant.db"
  *
  * Each check states a rule the books must obey and prints the rows that break it.
  * A clean run means no figure in the database contradicts any other figure: every

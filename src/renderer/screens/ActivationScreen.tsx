@@ -55,7 +55,7 @@ export default function ActivationScreen({ deviceId, reason, onActivated }: Prop
     <div className="login-container" dir="rtl">
       <div className="login-card animate-slide" style={{ maxWidth: 560 }}>
         <div className="login-logo">
-          <img src={logoUrl} alt="Crispo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          <img src={logoUrl} alt="أبو الدهب" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
         <h1 className="login-title">تفعيل البرنامج</h1>
         <p className="login-subtitle">هذا الجهاز غير مُفعَّل بعد</p>

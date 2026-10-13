@@ -1,4 +1,4 @@
-# Installs this build over a Crispo till, keeping its data.
+# Installs this build over an Abo El Dahab till, keeping its data.
 #
 # Copy the whole folder this script sits in onto the till (USB stick is fine), then
 # right-click this file > Run with PowerShell. It works on the master and on a node —
@@ -25,22 +25,22 @@ if (-not (Test-Path (Join-Path $payload 'resources\app.asar'))) {
 
 # ---- Where is the till installed? ----
 # The desktop folder is where these are always put; fall back to asking.
-$target = Join-Path ([Environment]::GetFolderPath('Desktop')) 'crispo'
+$target = Join-Path ([Environment]::GetFolderPath('Desktop')) 'aboeldahab'
 if (-not (Test-Path $target)) {
     Write-Host "Could not find $target" -ForegroundColor Yellow
-    $target = Read-Host "Full path of the till folder (the one containing Crispo.exe)"
+    $target = Read-Host "Full path of the till folder (the one containing AboElDahab.exe)"
 }
 if (-not (Test-Path $target)) {
     Write-Host "That folder does not exist. Nothing was changed." -ForegroundColor Red
     Read-Host "Press Enter to close"; exit 1
 }
 
-# Whatever this till calls its executable — Crispo.exe on these machines, but the
+# Whatever this till calls its executable — AboElDahab.exe on these machines, but the
 # shortcuts on the desktop point at it by name, so it must not change.
 $exe = Get-ChildItem $target -Filter *.exe |
        Where-Object { $_.Name -notlike 'Update*' } |
        Sort-Object Length -Descending | Select-Object -First 1
-$exeName = if ($exe) { $exe.Name } else { 'Crispo.exe' }
+$exeName = if ($exe) { $exe.Name } else { 'AboElDahab.exe' }
 
 Write-Host "Till folder : $target"
 Write-Host "Executable  : $exeName"

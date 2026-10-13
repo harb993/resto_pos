@@ -500,6 +500,10 @@ export default function POSScreen() {
   }
 
   const getCategoryIcon = (name: string) => {
+    if (name.includes('كشري') || name.includes('طاجن') || name.includes('طواجن')) return '🍲'
+    if (name.includes('شاورما')) return '🌯'
+    if (name.includes('مشوي') || name.includes('كفتة') || name.includes('كباب')) return '🍢'
+    if (name.includes('سلط')) return '🥗'
     if (name.includes('وجب') || name.includes('دجاج') || name.includes('Meal') || name.includes('Chicken')) return '🍗'
     if (name.includes('برجر') || name.includes('سندوتش') || name.includes('Burger')) return '🍔'
     if (name.includes('مقبل') || name.includes('بطاطس') || name.includes('Fries') || name.includes('Side')) return '🍟'
@@ -965,7 +969,7 @@ export default function POSScreen() {
                   alt=""
                   style={{ width: 68, height: 68, objectFit: 'contain', margin: '0 auto 6px', display: 'block' }}
                 />
-                <h2>{settings.business_name || 'Crispo Fried Chicken'}</h2>
+                <h2>{settings.business_name || 'أبو الدهب'}</h2>
                 <p style={{ fontSize: 11, color: '#4b5563' }}>{settings.business_address || 'القاهرة — مصر'}</p>
                 <p style={{ fontSize: 11, color: '#4b5563' }}>هاتف: {settings.business_phone || '+20 100 123 4567'}</p>
                 <div className="receipt-divider" />

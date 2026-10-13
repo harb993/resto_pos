@@ -379,7 +379,13 @@ export default function PrinterSettings({ settings, update, showToast }: Props) 
                     <td style={{ fontSize: 12 }}>
                       {p.connection === 'network'
                         ? <>شبكة<div style={{ color: 'var(--text-muted)' }}>{p.host}:{p.port}</div></>
-                        : <>ويندوز<div style={{ color: 'var(--text-muted)' }}>{p.device_name}</div></>}
+                        : p.device_name
+                          ? <>ويندوز<div style={{ color: 'var(--text-muted)' }}>{p.device_name}</div></>
+                          // A starter printer: its job is set, which Windows queue it is
+                          // can only be chosen on the premises.
+                          : <span style={{ color: 'var(--danger)', fontWeight: 700 }}>
+                              ⚠️ لم تُحدد بعد — اضغط «تعديل» واختر الطابعة ثم فعّلها
+                            </span>}
                     </td>
                     <td>{p.paper_width} مم{p.copies > 1 ? ` × ${p.copies}` : ''}</td>
                     <td>

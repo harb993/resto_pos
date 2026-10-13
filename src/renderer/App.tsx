@@ -316,7 +316,7 @@ function App() {
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="sidebar-logo">
-            <img src={logoUrl} alt="Crispo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            <img src={logoUrl} alt="أبو الدهب" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
           <div className="sidebar-brand">
             <span className="sidebar-title">{businessName}</span>
