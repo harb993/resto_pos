@@ -215,7 +215,7 @@ function App() {
     { id: 'dashboard', group: 'watch', label: 'لوحة التحكم', icon: '📊', roles: ['owner', 'accountant'] },
     { id: 'analytics', group: 'watch', label: 'تحليلات المبيعات', icon: '📈', roles: ['owner', 'accountant'] },
 
-    { id: 'menu', group: 'manage', label: 'قائمة الطعام', icon: '🍗', roles: ['owner'] },
+    { id: 'menu', group: 'manage', label: 'قائمة الطعام', icon: '🍽️', roles: ['owner'] },
     // Inventory IS the raw material store — chickens, buns, sauces, packaging.
     // Finished meals are never stocked, so there is no separate meal-stock screen.
     // Accountants get a read-only view; every write on it is owner-gated in main.

@@ -3,7 +3,7 @@ import path from 'node:path'
 import log from 'electron-log/main'
 import {
   initDatabase, closeDatabase, runBackup, isDemoMode, refreshDemoDatabaseIfStale,
-  clearAllBusinessData,
+  clearAllBusinessData, getDb,
 } from './db/db'
 import { registerAuthIpc } from './ipc/auth.ipc'
 import { registerMenuIpc } from './ipc/menu.ipc'
@@ -44,6 +44,7 @@ import { tickWorkShift, getWorkShiftStatus, onWorkShiftChanged } from './service
 import { getSettings } from './services/settingsService'
 import { getCurrentSession } from './services/authService'
 import { restoreCatalogCostsOnce } from './services/menuImportService'
+import { ensureDesktopShortcut, SHORTCUT_MARKER_KEY } from './services/desktopShortcut'
 
 import fs from 'node:fs'
 
@@ -127,6 +128,32 @@ function createWindow(): void {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
+  }
+}
+
+function placeDesktopShortcut(): void {
+  try {
+    const marker = getDb().prepare('SELECT value FROM settings WHERE key = ?')
+    const outcome = ensureDesktopShortcut({
+      platform: process.platform,
+      isPackaged: app.isPackaged,
+      // The portable build runs from a temporary copy; the shortcut must start the
+      // .exe the owner actually has, not that copy.
+      target: process.env.PORTABLE_EXECUTABLE_FILE || process.execPath,
+      desktopDir: app.getPath('desktop'),
+      exists: file => fs.existsSync(file),
+      readTarget: file => {
+        try { return shell.readShortcutLink(file).target || null } catch { return null }
+      },
+      write: (file, operation, options) => shell.writeShortcutLink(file, operation, options),
+      alreadyOffered: () => (marker.get(SHORTCUT_MARKER_KEY) as { value: string } | undefined)?.value === '1',
+      markOffered: () => {
+        getDb().prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(SHORTCUT_MARKER_KEY, '1')
+      },
+    })
+    if (outcome !== 'skipped') log.info(`[Shortcut] Desktop shortcut: ${outcome}`)
+  } catch (err) {
+    log.warn('[Shortcut] Could not place the desktop shortcut:', err)
   }
 }
 
@@ -263,6 +290,10 @@ app.whenReady().then(async () => {
 
   // 3. Create window
   createWindow()
+
+  // The «أبو الدهب» shortcut on the desktop, with the logo — first run only. The
+  // showcase account runs the same .exe with a flag, so it never makes one.
+  if (!isDemoMode()) placeDesktopShortcut()
 
   // 4. Try a backup on launch, but only if the newest one is over 20h old â€”
   //    otherwise a few restarts in a row would roll every older backup off the
