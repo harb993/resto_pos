@@ -30,6 +30,44 @@ if (-not (Test-Path $source)) {
 
 $target = if ($args.Count -gt 0 -and $args[0]) { $args[0] } else { $null }
 
+# Find the program by itself, so a double-click is enough: first where the desktop
+# shortcut «أبو الدهب» points (the program makes it on its first run), then the usual
+# folder on the desktop, then any folder on the desktop holding AboElDahab.exe.
+if (-not $target) {
+    $found = @()
+    $desktops = @([Environment]::GetFolderPath('Desktop'), (Join-Path $env:USERPROFILE 'Desktop')) |
+        Where-Object { $_ -and (Test-Path $_) } | Sort-Object -Unique
+    try {
+        $shell = New-Object -ComObject WScript.Shell
+        foreach ($d in $desktops) {
+            foreach ($l in Get-ChildItem -LiteralPath $d -Filter *.lnk -ErrorAction SilentlyContinue) {
+                # WScript cannot open a shortcut with an Arabic name — read a copy.
+                $probe = Join-Path $env:TEMP 'aboeldahab-probe.lnk'
+                Copy-Item -LiteralPath $l.FullName $probe -Force
+                $t = $shell.CreateShortcut($probe).TargetPath
+                if ($t -and (Split-Path -Leaf $t) -ieq 'AboElDahab.exe' -and (Test-Path $t)) { $found += (Split-Path -Parent $t) }
+            }
+        }
+    } catch { }
+    foreach ($d in $desktops) {
+        foreach ($exe in Get-ChildItem -LiteralPath $d -Filter AboElDahab.exe -Recurse -Depth 1 -ErrorAction SilentlyContinue) {
+            $found += $exe.DirectoryName
+        }
+    }
+    # Never the update's own folder, and each folder once.
+    $found = @($found | ForEach-Object { (Resolve-Path $_).Path } |
+        Where-Object { $_ -ne $here } | Sort-Object -Unique)
+    if ($found.Count -eq 1) {
+        $target = $found[0]
+        Line "   وجدت البرنامج في: $target"
+        Line ''
+    } elseif ($found.Count -gt 1) {
+        Line 'وجدت البرنامج في أكثر من مكان:'
+        $found | ForEach-Object { Line "   $_" }
+        Line ''
+    }
+}
+
 if (-not $target) {
     Line 'اسحب مجلد البرنامج وألقِه على UPDATE.bat،'
     Line 'أو اكتب مساره الآن ثم اضغط Enter:'

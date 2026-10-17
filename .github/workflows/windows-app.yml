@@ -120,3 +120,23 @@ jobs:
             }
           }
           if (-not $found) { throw "no desktop shortcut opens $want (looked in: $($dirs -join ', '))" }
+
+      # What the owner does: unzip the quick update and double-click UPDATE.bat, with
+      # no folder given. It must find the program on its own — here, through the
+      # desktop shortcut the smoke test's first run just made — and update it.
+      - name: Quick update — finds the program by itself
+        shell: pwsh
+        run: |
+          $u = (Resolve-Path update/AboElDahab-Update).Path
+          $out = Join-Path $env:RUNNER_TEMP 'update-out.txt'
+          $p = Start-Process cmd -ArgumentList '/c', "`"$u\UPDATE.bat`"" -PassThru -NoNewWindow -RedirectStandardOutput $out
+          # It ends waiting for Enter; give it time to get there, then close it.
+          $null = $p.WaitForExit(90000)
+          Start-Sleep -Seconds 3
+          Get-Process powershell -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+          Get-Content $out -ErrorAction SilentlyContinue
+          $resources = Join-Path $env:RUNNER_TEMP 'smoke\aboeldahab\resources'
+          $backup = Get-ChildItem $resources -Filter 'app.asar.backup-*' -ErrorAction SilentlyContinue
+          if (-not $backup) { throw 'UPDATE.bat did not find and update the program by itself' }
+          "updated, old copy kept as $($backup.Name)"
