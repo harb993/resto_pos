@@ -143,7 +143,9 @@ export default function MenuManagementScreen() {
   }
 
   const saveItem = async () => {
-    if (!form.name || !form.price) return
+    // A price of 0 is a real price — «دقة + شطة» is free — so only a missing or
+    // negative one stops the save.
+    if (!form.name?.trim() || form.price == null || form.price < 0) return
     const res = await window.api.upsertMenuItem(form)
     if (res.success) {
       showToastMsg(editItem ? 'تم تحديث بيانات الوجبة' : 'تم إضافة الوجبة بنجاح')

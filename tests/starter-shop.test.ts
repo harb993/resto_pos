@@ -56,17 +56,42 @@ describe('the printers', () => {
 
 describe('the starter menu', () => {
   it('sends each category to the kitchen that cooks it', () => {
-    expect(printerOf('كشري')).toBe('كشري وطواجن')
-    expect(printerOf('طواجن')).toBe('كشري وطواجن')
-    expect(printerOf('إضافات الكشري')).toBe('كشري وطواجن')
-    expect(printerOf('حلويات')).toBe('كشري وطواجن')
-    expect(printerOf('شاورما')).toBe('شاورما ومشويات')
-    expect(printerOf('مشويات')).toBe('شاورما ومشويات')
-    expect(printerOf('سلطات ومقبلات')).toBe('شاورما ومشويات')
+    for (const c of ['الكشري', 'إضافات الكشري', 'ميكسات الكشري', 'الطواجن المكرونة', 'إضافات الطواجن']) {
+      expect(printerOf(c), c).toBe('كشري وطواجن')
+    }
+    for (const c of [
+      'وجبات الفراخ - شواية', 'وجبات الفراخ - على الفحم', 'الكفتة', 'إضافات الفراخ',
+      'سندوتشات الشاورما', 'إضافات الشاورما', 'قسم الغربي', 'إضافات الغربي',
+    ]) {
+      expect(printerOf(c), c).toBe('شاورما ومشويات')
+    }
   })
 
-  it('prints no prep ticket for drinks', () => {
-    expect(printerOf('مشروبات')).toBe('none')
+  it('prints no prep ticket for drinks and desserts', () => {
+    expect(printerOf('المشروبات والحلويات')).toBe('none')
+  })
+
+  it('is the shop menu as printed: 14 sections, 92 dishes', () => {
+    const n = (sql: string) => (getDb().prepare(sql).get() as { n: number }).n
+    expect(n('SELECT COUNT(*) AS n FROM categories')).toBe(14)
+    expect(n('SELECT COUNT(*) AS n FROM menu_items')).toBe(92)
+    const price = (cat: string, name: string) => (getDb().prepare(`
+      SELECT mi.price FROM menu_items mi JOIN categories c ON c.category_id = mi.category_id
+      WHERE c.name = ? AND mi.name = ?`).get(cat, name) as { price: number }).price
+    expect(price('وجبات الفراخ - شواية', 'فرخة شواية')).toBe(400)
+    expect(price('الكفتة', '1/8 كيلو كفتة')).toBe(100)
+    expect(price('الكشري', 'كشري أبو الدهب')).toBe(60)
+    expect(price('إضافات الفراخ', 'باكت بطاطس')).toBe(25)
+    expect(price('إضافات الكشري', 'باكت بطاطس')).toBe(35)   // same add-on, its own price
+    expect(price('إضافات الكشري', 'دقة + شطة')).toBe(0)     // مجاناً
+    expect(price('المشروبات والحلويات', 'مياه كبيرة')).toBe(20)
+  })
+
+  it('says what each meal comes with', () => {
+    const desc = (name: string) => (getDb().prepare(
+      'SELECT description FROM menu_items WHERE name = ?').get(name) as { description: string }).description
+    expect(desc('ربع فرخة صدر على الفحم')).toBe('مع: أرز بسمتي + بطاطس + تومية + مخلل + عيش')
+    expect(desc('1/2 كيلو كفتة')).toBe('مع: أرز بسمتي + بطاطس + طحينة + عيش + مخلل')
   })
 
   it('has something to sell in every category', () => {
@@ -91,7 +116,7 @@ describe('once only', () => {
     restart()
     expect(printers().map(p => p.name)).toEqual(['الكاشير', 'كشري وطواجن'])
     // …and its categories went back to automatic rather than pointing at nothing.
-    expect(printerOf('شاورما')).toBeNull()
+    expect(printerOf('سندوتشات الشاورما')).toBeNull()
   })
 
   it('an emptied printer list stays empty', () => {

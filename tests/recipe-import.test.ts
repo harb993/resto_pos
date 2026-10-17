@@ -71,6 +71,14 @@ describe('the catalogue itself', () => {
 })
 
 describe('importing onto a menu that is not there yet', () => {
+  // An empty menu, rather than whatever the till starts with: the shop's own starter
+  // menu shares the odd name with this catalogue («بطاطس»).
+  beforeAll(() => {
+    for (const t of ['item_variant_options', 'item_variant_groups', 'menu_items', 'categories']) {
+      getDb().prepare(`DELETE FROM ${t}`).run()
+    }
+  })
+
   it('skips every dish rather than inventing menu items with no price', () => {
     const before = (getDb().prepare('SELECT COUNT(*) AS c FROM menu_items').get() as any).c
 

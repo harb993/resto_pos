@@ -8,6 +8,7 @@ import log from 'electron-log/main'
 // Statically imported so the bundler resolves it; it does nothing unless --demo is set.
 import { seedDemoData } from './demoSeed'
 import { STARTER_MENU, STARTER_PRINTERS, CASHIER_ONLY } from './starterShop'
+import { upgradeToShopMenu } from './menuUpgrade'
 
 let db: Database.Database
 
@@ -291,6 +292,14 @@ export function initDatabase(): Database.Database {
 
     markStarterContentHandled()
     log.info(`[DB] Seeded the starter menu: ${STARTER_MENU.length} categories, ${items} items`)
+  }
+
+  // A till that opened on the invented menu of the first builds moves onto the shop's
+  // real one — once, keeping everything the owner made. See menuUpgrade.ts.
+  try {
+    upgradeToShopMenu(db)
+  } catch (err) {
+    log.error('[Menu] Could not move onto the shop menu — the current menu is unchanged:', err)
   }
 
   // Only ever touches the demo database — see isDemoMode().

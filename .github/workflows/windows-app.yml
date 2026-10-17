@@ -54,6 +54,24 @@ jobs:
           path: release/
           retention-days: 30
 
+      # The quick update: only resources\app.asar, the update script and its guide —
+      # for a till that already has the program, so the data folder is never touched.
+      - name: Assemble the quick update
+        shell: pwsh
+        run: |
+          $u = 'update/AboElDahab-Update'
+          New-Item -ItemType Directory -Force "$u/resources" | Out-Null
+          Copy-Item dist/win-unpacked/resources/app.asar "$u/resources/"
+          Copy-Item tools/UPDATE.bat, tools/update.ps1 $u
+          Copy-Item tools/quick-update/* $u
+          Get-ChildItem $u -Recurse -File | ForEach-Object { "$($_.FullName.Substring((Resolve-Path $u).Path.Length)) $([math]::Round($_.Length / 1MB, 1)) MB" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AboElDahab-Update
+          path: update/
+          retention-days: 30
+
       # On a copy, so the database the first run creates never ends up in the download.
       - name: Smoke test — start it and read its log
         shell: pwsh
