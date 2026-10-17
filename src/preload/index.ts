@@ -153,6 +153,8 @@ const api = {
   getWorkShiftStatus: () => ipcRenderer.invoke('workShift:status'),
   listWorkShifts: () => ipcRenderer.invoke('workShift:list'),
   startWorkShift: () => ipcRenderer.invoke('workShift:start'),
+  /** «تقفيل»: end the running shift now and print its slip. */
+  closeWorkShiftAndPrint: (pin: string) => ipcRenderer.invoke('workShift:closeAndPrint', { pin }),
   onWorkShiftChanged: (cb: (data: any) => void) => {
     const handler = (_e: unknown, data: any) => cb(data)
     ipcRenderer.on('app:workShiftChanged', handler)
@@ -167,6 +169,21 @@ const api = {
     ipcRenderer.invoke('shifts:openExportFolder', { folder }),
   /** One WhatsApp window for the whole campaign: each call re-uses it. */
   openWhatsappChat: (phone: string, text: string) => ipcRenderer.invoke('whatsapp:openChat', { phone, text }),
+  // A campaign that sends itself: the picture is chosen in the main process, the list
+  // and the text go in once, and progress comes back as events.
+  whatsappPickImage: () => ipcRenderer.invoke('whatsapp:pickImage'),
+  whatsappClearImage: () => ipcRenderer.invoke('whatsapp:clearImage'),
+  whatsappCampaignStart: (recipients: { phone: string; name?: string | null }[], text: string, withPicture: boolean) =>
+    ipcRenderer.invoke('whatsapp:campaignStart', { recipients, text, withPicture }),
+  whatsappCampaignStop: () => ipcRenderer.invoke('whatsapp:campaignStop'),
+  whatsappCampaignAgain: () => ipcRenderer.invoke('whatsapp:campaignAgain'),
+  whatsappShowWindow: () => ipcRenderer.invoke('whatsapp:showWindow'),
+  whatsappCampaignStatus: () => ipcRenderer.invoke('whatsapp:campaignStatus'),
+  onWhatsappProgress: (cb: (data: any) => void) => {
+    const handler = (_e: unknown, data: any) => cb(data)
+    ipcRenderer.on('app:whatsappProgress', handler)
+    return () => { ipcRenderer.removeListener('app:whatsappProgress', handler) }
+  },
   getWhatsappTarget: () => ipcRenderer.invoke('shifts:whatsappTarget'),
   /** «تقفيل الوردية» for a configured shift; no arguments means the one running now. */
   getClosingReport: (workShiftId?: number) => ipcRenderer.invoke('closing:report', { workShiftId }),

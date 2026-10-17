@@ -5,6 +5,7 @@ import NumberInput from '../../components/NumberInput'
 import PrinterSettings from './PrinterSettings'
 import NetworkSettings from './NetworkSettings'
 import ShopDataPanel from './ShopDataPanel'
+import UsersScreen from './UsersScreen'
 import { THEMES, currentTheme, setTheme, type ThemeId } from '../../lib/theme'
 
 /**
@@ -68,7 +69,7 @@ export default function SettingsScreen() {
   )
 }
 
-type SettingsTab = 'shop' | 'shifts' | 'delivery' | 'printing' | 'network' | 'data' | 'security'
+type SettingsTab = 'shop' | 'shifts' | 'delivery' | 'printing' | 'network' | 'users' | 'data' | 'security'
 
 const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
   { id: 'shop', label: '🏢 المطعم والضريبة' },
@@ -76,6 +77,9 @@ const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
   { id: 'delivery', label: '🛵 التوصيل' },
   { id: 'printing', label: '🖨️ الطابعات' },
   { id: 'network', label: '🖧 الأجهزة والشبكة' },
+  // The four sign-in accounts: behind the settings PIN with everything else that
+  // decides who may do what, rather than an entry of their own in the sidebar.
+  { id: 'users', label: '🔑 المستخدمون' },
   { id: 'data', label: '📦 تصدير البيانات' },
   { id: 'security', label: '🛡️ الأمان والنسخ الاحتياطي' },
 ]
@@ -158,6 +162,11 @@ function SettingsBody() {
   const [theme, setThemeState] = useState<ThemeId>(() => currentTheme())
   const chooseTheme = (id: ThemeId) => { setTheme(id); setThemeState(id) }
   const only = (t: SettingsTab): React.CSSProperties => (tab === t ? {} : { display: 'none' })
+  // The showcase account does not show this installation's real usernames.
+  const [showcase, setShowcase] = useState(false)
+  useEffect(() => {
+    window.api?.getAppMode?.().then((res: any) => { if (res?.success) setShowcase(!!res.data.demo) })
+  }, [])
 
   const touched = React.useRef(false)
 
@@ -438,7 +447,7 @@ function SettingsBody() {
       )}
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
-        {SETTINGS_TABS.map(x => (
+        {SETTINGS_TABS.filter(x => !(showcase && x.id === 'users')).map(x => (
           <button
             key={x.id}
             className={`cat-pill-btn ${tab === x.id ? 'active' : ''}`}
@@ -797,6 +806,8 @@ function SettingsBody() {
       <div style={only('network')}>
         <NetworkSettings showToast={showToast} />
       </div>
+
+      {tab === 'users' && !showcase && <UsersScreen />}
 
       <div style={only('data')}>
         <ShopDataPanel showToast={showToast} active={tab === 'data'} />

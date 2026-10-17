@@ -238,6 +238,37 @@ export function startWorkShiftManually(userId: number, now = new Date()): WorkSh
   return describe(row)
 }
 
+/**
+ * «تقفيل» — end the running shift now, rather than at its configured time.
+ *
+ * The till closes when the last customer has gone, which is not always the minute the
+ * settings say. Ending it here closes the books for that shift on the spot: the slip
+ * printed next is final, and the till takes no more sales until the next shift starts
+ * — by itself at its configured time, or by the owner before that.
+ *
+ * With nothing running (the shift already ended at its time) this changes nothing and
+ * names the shift that ended last, so the slip for it can still be printed.
+ */
+export function closeWorkShiftNow(now = new Date()): { closed: boolean; shift: WorkShift | null } {
+  tickWorkShift(now)
+  const open = openRow()
+  if (!open) {
+    const last = latestRow()
+    return { closed: false, shift: last ? describe(last) : null }
+  }
+
+  // Never before it began: a clock that has been put back must not produce a shift
+  // that ends before its own start.
+  const at = Math.max(now.getTime(), parse(open.opened_at).getTime())
+  db().prepare(`UPDATE work_shifts SET closed_at = ? WHERE work_shift_id = ?`)
+    .run(stamp(new Date(at)), open.work_shift_id)
+  log.info(`[WorkShift] #${open.work_shift_id} closed by hand at ${stamp(new Date(at))}`)
+  if (listener) setImmediate(listener)
+
+  const row = db().prepare('SELECT * FROM work_shifts WHERE work_shift_id = ?').get(open.work_shift_id) as Row
+  return { closed: true, shift: describe(row) }
+}
+
 function describe(row: Row): WorkShift {
   const opened = parse(row.opened_at)
   const end = row.closed_at ? parse(row.closed_at) : scheduledEnd(row.shift_number, opened)

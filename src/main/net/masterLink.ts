@@ -30,7 +30,7 @@ import crypto from 'node:crypto'
 import type { Socket } from 'node:net'
 import log from 'electron-log/main'
 import { Link } from './link'
-import { invokeLocal } from './router'
+import { invokeLocal, isLocalChannel } from './router'
 import { runWithSession } from '../services/authService'
 import { getSettings, updateSettings } from '../services/settingsService'
 import { snapshotDatabase } from '../db/db'
@@ -519,7 +519,7 @@ function dial(t: Runtime): Promise<Link> {
 async function serveForTill(t: Runtime, channel: string, payload: unknown): Promise<IpcResponse> {
   t.lastSeen = Date.now()
 
-  if (NODE_FORBIDDEN_CHANNELS.has(channel)) {
+  if (NODE_FORBIDDEN_CHANNELS.has(channel) || isLocalChannel(channel)) {
     return { success: false, error: 'هذا الإجراء متاح على الجهاز الرئيسي فقط' }
   }
   if (t.record.locked) {

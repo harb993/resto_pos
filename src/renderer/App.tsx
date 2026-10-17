@@ -16,7 +16,6 @@ import logoUrl from './assets/logo.png'
 // recharts is ~1 MB and is used by this screen alone. Loading it on demand keeps
 // it off the POS startup path, which matters on the low-spec PCs a till runs on.
 const AnalyticsScreen = React.lazy(() => import('./screens/owner/AnalyticsScreen'))
-import UsersScreen from './screens/owner/UsersScreen'
 import SettingsScreen from './screens/owner/SettingsScreen'
 import ExpensesScreen from './screens/owner/ExpensesScreen'
 import SuppliersScreen from './screens/owner/SuppliersScreen'
@@ -24,17 +23,14 @@ import WorkersScreen from './screens/owner/WorkersScreen'
 import SalariesScreen from './screens/owner/SalariesScreen'
 import ShiftsScreen from './screens/owner/ShiftsScreen'
 import WhatsappCampaignScreen from './screens/owner/WhatsappCampaignScreen'
-import ClosingModal from './components/ClosingModal'
+import CloseShiftDialog from './components/CloseShiftDialog'
 import { WorkShiftGate, WorkShiftBadge } from './components/WorkShift'
 
 /**
- * Screens the showcase account does not show.
- *
- * `users` manages the four real sign-in accounts of THIS installation. On the demo
- * books those rows mean nothing, and putting somebody's usernames on screen during a
- * sales demonstration has no upside at all.
+ * Screens the showcase account does not show. (The sign-in accounts, once the entry
+ * here, now live inside the settings and are hidden there — see SettingsScreen.)
  */
-const SHOWCASE_HIDDEN = new Set<string>(['users'])
+const SHOWCASE_HIDDEN = new Set<string>([])
 
 function App() {
   const user = useAuthStore((s) => s.user)
@@ -166,6 +162,16 @@ function App() {
     return window.api.onShiftExported((data: any) => setShiftExport(data))
   }, [])
 
+  // A WhatsApp campaign carries on wherever the owner goes in the app, so the sidebar
+  // says how far it has got — nobody has to sit on the campaign screen to know.
+  const [waCampaign, setWaCampaign] = React.useState<{ state: string; done: number; total: number } | null>(null)
+  useEffect(() => {
+    if (user?.role !== 'owner' || !window.api?.onWhatsappProgress) { setWaCampaign(null); return }
+    window.api.whatsappCampaignStatus?.().then((res: any) => { if (res?.success) setWaCampaign(res.data) })
+    return window.api.onWhatsappProgress((p: any) => setWaCampaign(p))
+  }, [user?.role])
+  const waSending = !!waCampaign && (waCampaign.state === 'sending' || waCampaign.state === 'waiting-login')
+
   // Wait for the licence answer rather than flashing the activation screen at a
   // machine that turns out to be fine.
   if (licence === null) return null
@@ -224,7 +230,6 @@ function App() {
     { id: 'workers', group: 'manage', label: 'العمال', icon: '👨‍🍳', roles: ['owner', 'accountant'] },
     { id: 'customers', group: 'manage', label: 'العملاء', icon: '👥', roles: ['owner', 'accountant'] },
     { id: 'whatsapp', group: 'manage', label: 'واتساب تسويق', icon: '💬', roles: ['owner'] },
-    { id: 'users', group: 'manage', label: 'المستخدمون', icon: '🔑', roles: ['owner'] },
     { id: 'settings', group: 'manage', label: 'الإعدادات', icon: '⚙️', roles: ['owner'] },
   ]
 
@@ -264,7 +269,6 @@ function App() {
     workers: <WorkersScreen />,
     salaries: <SalariesScreen />,
     shifts: <ShiftsScreen />,
-    users: <UsersScreen />,
     settings: <SettingsScreen />,
     whatsapp: <WhatsappCampaignScreen />,
   }
@@ -349,6 +353,9 @@ function App() {
                       {hasAlert && !open && (
                         <span className="badge badge-danger" style={{ marginRight: 8, fontSize: 10 }}>{lowStockAlerts.length}</span>
                       )}
+                      {g.id === 'manage' && waSending && !open && (
+                        <span className="badge badge-success" style={{ marginRight: 8, fontSize: 10 }}>💬 {waCampaign!.done}/{waCampaign!.total}</span>
+                      )}
                     </span>
                     <span style={{ fontSize: 12, opacity: 0.8 }}>{open ? '▾' : '◂'}</span>
                   </button>
@@ -364,6 +371,11 @@ function App() {
                     {n.id === 'inventory' && lowStockAlerts.length > 0 && (
                       <span className="badge badge-danger" style={{ marginRight: 'auto', fontSize: 11 }}>
                         {lowStockAlerts.length}
+                      </span>
+                    )}
+                    {n.id === 'whatsapp' && waSending && (
+                      <span className="badge badge-success" style={{ marginRight: 'auto', fontSize: 11 }} title="جاري إرسال الحملة">
+                        {waCampaign!.state === 'waiting-login' ? '📱 الكود' : `${waCampaign!.done}/${waCampaign!.total}`}
                       </span>
                     )}
                   </button>
@@ -404,8 +416,10 @@ function App() {
         </React.Suspense>
       </main>
 
-      {closingOpen && <ClosingModal onClose={() => setClosingOpen(false)} />}
-      <WorkShiftGate />
+      {closingOpen && <CloseShiftDialog onClose={() => setClosingOpen(false)} />}
+      {/* Not while the close-up dialog is still on screen: it says the shift has ended
+          in its own words first, and two dialogs on top of each other say nothing. */}
+      {!closingOpen && <WorkShiftGate />}
       {shiftExport && <ShiftExportBanner data={shiftExport} onClose={() => setShiftExport(null)} />}
     </div>
   )

@@ -901,14 +901,21 @@ export function salesProductsHtml(
 }
 
 /**
- * «تقفيل الوردية» on the counter printer.
+ * «تقفيل الوردية» on the counter printer — short enough to keep.
  *
- * The figures first — takings, what went out, what the drawer should hold — because
- * that is the part somebody counts cash against. No profit on it: this slip is handled
- * at the counter, and profit is on the owner's own report. The line-per-invoice and
- * line-per-expense lists follow, so the top of the strip is the answer and the rest is
- * the proof of it. The lists are set a size smaller: they are the long part, and on a
- * busy night they decide how much of the roll this takes.
+ * It used to carry a line for every invoice of the shift, which on a normal night is
+ * sixty lines and on a busy one two hundred: a strip a metre long, with the figures
+ * anybody actually reads lost at the top of it. The invoices are on the shift report
+ * (PDF and Excel); the slip is the page the drawer is counted against, so it holds
+ * what that takes and nothing else:
+ *
+ *   the sales         how many, cash and card, by order type
+ *   what went out     every expense and every wage, one line each, then their totals
+ *   the drawer        how the expected cash is arrived at, boxed
+ *
+ * No profit on it: this slip is handled at the counter, and profit is on the owner's
+ * own report. Spacing is tight and the text is held to at most 110% even where the
+ * shop prints its receipts larger — the slip is read at the counter, not across it.
  */
 export function closingHtml(
   r: ClosingReport,
@@ -916,110 +923,99 @@ export function closingHtml(
   opts: TicketOptions & { printedBy?: string | null },
 ): string {
   const amt = (n: number) => `<span class="num">${(Number(n) || 0).toFixed(2)}</span>`
+  const n = (v: number) => `<span class="num">${v}</span>`
   const line = (label: string, value: string, cls = '') =>
     `<div class="row ${cls}"><span>${label}</span><span>${value}</span></div>`
-  const heading = (text: string) =>
-    `<div class="rule"></div><div class="b c" style="font-size:1.1rem">${text}</div>`
-  const item = (main: string, sub: string, value: string, struck = false) => `
-    <div class="row li"${struck ? ' style="text-decoration:line-through"' : ''}>
-      <span style="flex:1">${main}${sub ? ` <span class="sub">${sub}</span>` : ''}</span>
-      <span>${value}</span>
-    </div>`
+  const heading = (text: string) => `<div class="rule"></div><div class="h">${text}</div>`
+  /** dd/mm hh:mm — the date matters on a night shift that ends after midnight. */
+  const when = (stampText: string) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(stampText)
+    return m ? `${m[3]}/${m[2]} ${m[4]}:${m[5]}` : stampText
+  }
 
-  const invoices = r.invoices.map(i => item(
-    `<span class="num">${esc(i.invoiceNumber || `#${i.orderId}`)}</span>`,
-    `<span class="num">${esc(i.time)}</span> ${esc(i.orderTypeLabel)}` +
-      `${i.paymentType === 'card' ? ' · بطاقة' : ''}${i.status === 'voided' ? ' · ملغاة' : ''}`,
-    amt(i.total),
-    i.status === 'voided',
-  )).join('')
+  /** A whole pound needs no ".00" in a list of small payments — it is what lets two fit a line. */
+  const short = (v: number) => {
+    const x = Number(v) || 0
+    return `<span class="num">${Number.isInteger(x) ? x : x.toFixed(2)}</span>`
+  }
 
-  const expenses = r.expenses.map(e => item(
-    esc(e.description !== '—' ? e.description : e.category),
-    `<span class="num">${esc(e.time)}</span> ${esc(e.category)} · ${esc(e.recordedBy)}`,
-    amt(e.amount),
-  )).join('')
+  // Every payment out — expenses by what they were for, then wages, then suppliers.
+  // These are what the drawer is short by, so each one is shown; two to a line, which
+  // is what keeps a night with fifteen of them to half a hand's length of paper.
+  const outCells = [
+    ...r.expenses.map(e => [esc(e.description !== '—' ? e.description : e.category), e.amount] as const),
+    ...r.salaries.map(s => [`مرتب ${esc(s.workerName)}`, s.amount] as const),
+    ...r.supplierPayments.map(s => [`مورد ${esc(s.supplierName)}${s.method === 'cash' ? '' : '*'}`, s.amount] as const),
+  ].map(([name, value]) => `<div class="cell"><span class="nm">${name}</span>${short(value)}</div>`)
+  const outLines = outCells.length ? `<div class="grid">${outCells.join('')}</div>` : ''
 
-  const supplierPayments = r.supplierPayments.map(s => item(
-    esc(s.supplierName),
-    `<span class="num">${esc(s.time)}</span>${s.method === 'cash' ? '' : ' · غير نقدي'}`,
-    amt(s.amount),
-  )).join('')
-
-  const salaries = r.salaries.map(s => item(
-    esc(s.workerName), `<span class="num">${esc(s.time)}</span>`, amt(s.amount),
-  )).join('')
+  const byType = r.byOrderType
+    .map(t => line(`${esc(t.label)} (${n(t.orders)})`, amt(t.total), 'li'))
+    .join('')
 
   const body = `
-    <div class="c b" style="font-size:1.45rem">${esc(brand.businessName)}</div>
-    <div class="c b" style="font-size:1.25rem;margin-top:2px">تقفيل الوردية</div>
-    <div class="c b" style="font-size:1.1rem">${esc(r.shiftName)} · <span class="num">${esc(r.shiftDate)}</span></div>
-    <div class="rule"></div>
-    ${line('من:', `<span class="num">${esc(r.startTime)}</span>`)}
-    ${line('إلى:', r.isOpen ? `<span class="num">${esc(r.endTime)}</span> (جارية)` : `<span class="num">${esc(r.endTime)}</span>`)}
-    ${line('طُبع:', `<span class="num">${esc(stamp())}</span>`)}
-    ${opts.printedBy ? line('بواسطة:', esc(opts.printedBy)) : ''}
+    <div class="c b" style="font-size:1.3rem">${esc(brand.businessName)}</div>
+    <div class="c b" style="font-size:1.1rem">تقفيل الوردية · ${esc(r.shiftName)}</div>
+    <div class="c" style="font-size:0.85rem">
+      <span class="num">${esc(when(r.from))}</span> ←
+      ${r.isOpen ? 'جارية' : `<span class="num">${esc(when(r.endsAt))}</span>`}
+    </div>
+    <div class="c" style="font-size:0.75rem">طُبع <span class="num">${esc(stamp())}</span>${opts.printedBy ? ` · ${esc(opts.printedBy)}` : ''}</div>
 
     ${heading('المبيعات')}
-    ${line('عدد الفواتير', `<span class="num">${r.orderCount}</span>`)}
-    ${line(`نقدي (<span class="num">${r.cashOrders}</span>)`, amt(r.cashSales))}
-    ${line(`بطاقة (<span class="num">${r.cardOrders}</span>)`, amt(r.cardSales))}
-    ${r.byOrderType.map(t => line(`${esc(t.label)} (<span class="num">${t.orders}</span>)`, amt(t.total), 'li')).join('')}
-    ${r.discount > 0 ? line('الخصومات', amt(r.discount), 'li') : ''}
-    ${r.deliveryFees > 0 ? line('رسوم التوصيل', amt(r.deliveryFees), 'li') : ''}
-    ${r.tax > 0 ? line('الضريبة', amt(r.tax), 'li') : ''}
-    ${r.voidedCount > 0 ? line(`ملغاة (<span class="num">${r.voidedCount}</span>)`, amt(r.voidedValue), 'li') : ''}
-    ${line('إجمالي المبيعات', `${amt(r.revenue)}`, 'b big')}
+    ${line(`عدد الفواتير`, n(r.orderCount))}
+    ${line(`نقدي (${n(r.cashOrders)})`, amt(r.cashSales))}
+    ${r.cardSales > 0 || r.cardOrders > 0 ? line(`بطاقة (${n(r.cardOrders)})`, amt(r.cardSales)) : ''}
+    ${byType}
+    ${r.discount > 0 ? line('خصومات', amt(r.discount), 'li') : ''}
+    ${r.voidedCount > 0 ? line(`ملغاة (${n(r.voidedCount)})`, amt(r.voidedValue), 'li') : ''}
+    ${line('إجمالي المبيعات', amt(r.revenue), 'b big')}
 
-    ${heading('المصروفات')}
-    ${line('مصروفات', amt(r.expensesTotal))}
+    ${heading('المصروفات والمرتبات')}
+    ${outLines || '<div class="c li">لا توجد مصروفات ولا مرتبات</div>'}
+    <div class="thin"></div>
+    ${line('إجمالي المصروفات', amt(r.expensesTotal))}
+    ${line('إجمالي المرتبات', amt(r.salariesTotal))}
     ${r.supplierPaymentsTotal > 0 ? line('مدفوعات موردين', amt(r.supplierPaymentsTotal)) : ''}
-    ${r.salariesTotal > 0 ? line('مرتبات', amt(r.salariesTotal)) : ''}
-    ${line('إجمالي المصروفات', amt(r.outgoingsTotal), 'b big')}
+    ${line('إجمالي المدفوع', amt(r.outgoingsTotal), 'b')}
 
-    ${heading('الدرج')}
-    ${line('مبيعات نقدية', amt(r.cashSales))}
-    ${r.driverCashOut > 0 ? line('− مع السائقين (دليفري)', amt(r.driverCashOut), 'li') : ''}
-    ${r.settlementsReceived > 0 ? line('+ توريد السائقين', amt(r.settlementsReceived), 'li') : ''}
-    ${line('− مصروفات', amt(r.expensesTotal), 'li')}
-    ${r.salariesTotal > 0 ? line('− مرتبات', amt(r.salariesTotal), 'li') : ''}
-    ${r.supplierCashTotal > 0 ? line('− موردين (نقدي)', amt(r.supplierCashTotal), 'li') : ''}
     <div class="box">
-      <div class="c" style="font-size:0.95rem">النقدية المتوقعة في الدرج</div>
-      <div class="c b" style="font-size:1.5rem">${amt(r.expectedCash)} ${esc(brand.currency)}</div>
+      <div class="row b big" style="margin:0"><span>النقدية في الدرج</span><span>${amt(r.expectedCash)}</span></div>
+      <div class="how">
+        نقدي ${short(r.cashSales)}
+        − مدفوع ${short(r.expensesTotal + r.salariesTotal + r.supplierCashTotal)}
+        ${r.driverCashOut > 0 ? `− مع السائقين ${short(r.driverCashOut)}` : ''}
+        ${r.settlementsReceived > 0 ? `+ توريد ${short(r.settlementsReceived)}` : ''}
+      </div>
     </div>
     ${r.driverCashPending > 0 ? line('لم يُورَّد من السائقين بعد', amt(r.driverCashPending), 'li') : ''}
+    ${r.supplierPayments.some(s => s.method !== 'cash') ? '<div class="li">* مدفوع لمورد بغير النقدية — لم يخرج من الدرج</div>' : ''}
 
-    ${r.byCashier.length > 1 ? heading('حسب الكاشير') + r.byCashier.map(c =>
-      item(esc(c.name), `<span class="num">${c.orders}</span> فاتورة`, amt(c.total))).join('') : ''}
-
-    ${heading(`فواتير البيع (<span class="num">${r.invoices.length}</span>)`)}
-    ${invoices || '<div class="c li">لا توجد فواتير</div>'}
-
-    ${heading(`المصروفات (<span class="num">${r.expenses.length}</span>)`)}
-    ${expenses || '<div class="c li">لا توجد مصروفات</div>'}
-
-    ${supplierPayments ? heading('مدفوعات الموردين') + supplierPayments : ''}
-    ${salaries ? heading('المرتبات') + salaries : ''}
-
-    <div class="rule"></div>
-    <div class="row" style="margin-top:1.6rem;font-size:0.9rem">
-      <span>توقيع الكاشير: ............</span>
-    </div>
-    <div class="row" style="margin-top:1.2rem;font-size:0.9rem">
-      <span>توقيع المدير: ............</span>
-    </div>
+    <div class="sign"><span>توقيع الكاشير</span><span>توقيع المدير</span></div>
     ${feedBlock(opts.feedLines)}
   `
-  return shell(opts.widthPx, body, opts.fontScale, CLOSING_CSS)
+  // Held to 110% at most: the shop's receipt size is chosen for a customer reading at
+  // arm's length; this is a page of figures, and every step up adds to its length.
+  const scale = Math.min(Number(opts.fontScale) || 100, 110)
+  return shell(opts.widthPx, body, scale, CLOSING_CSS)
 }
 
 const CLOSING_CSS = `
-  .row { font-size: 1.05rem; margin-top: 2px; break-inside: avoid; }
-  .row.big { font-size: 1.2rem; margin-top: 4px; }
+  body { line-height: 1.2; }
+  .row { font-size: 1rem; margin: 0; break-inside: avoid; }
+  .row.big { font-size: 1.15rem; }
   .row.li, .li { font-size: 0.85rem; }
-  .sub { font-size: 0.72rem; }
-  .box { border: 2px solid #000; padding: 0.3rem; margin-top: 0.4rem; }
+  .h { font-size: 1rem; font-weight: 700; text-align: center; margin-bottom: 0.1rem; }
+  .rule { margin: 0.25rem 0; }
+  .thin { border-top: 1px dotted #000; margin: 0.15rem 0; }
+  .box { border: 2px solid #000; padding: 0.15rem 0.3rem; margin-top: 0.2rem; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 0.7rem; font-size: 0.8rem; }
+  .cell { display: flex; justify-content: space-between; gap: 0.3rem; min-width: 0; }
+  .nm { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .how { font-size: 0.72rem; text-align: center; }
+  .sign { display: flex; justify-content: space-between; font-size: 0.8rem;
+          margin-top: 1.2rem; padding: 0 0.2rem; }
+  .sign span { border-top: 1px dotted #000; padding-top: 0.1rem; min-width: 40%; text-align: center; }
 `
 
 export function testPageHtml(

@@ -3,7 +3,7 @@ import { handle } from '../net/router'
 import * as shift from '../services/shiftService'
 import { getShiftReport, getWorkShiftReport } from '../services/shiftReportService'
 import {
-  getWorkShiftStatus, startWorkShiftManually, listWorkShifts,
+  getWorkShiftStatus, startWorkShiftManually, listWorkShifts, closeWorkShiftNow,
 } from '../services/workShiftService'
 import { getClosingReport } from '../services/closingService'
 import { printClosingReport } from '../services/printerService'
@@ -44,6 +44,16 @@ function reportFor(shiftId: number, work: unknown) {
   return report
 }
 
+/**
+ * The password «تقفيل الوردية» asks for. Fixed, like the settings PIN and for the same
+ * reason: account passwords get handed around, and ending the shift stops the till
+ * taking sales. Checked here, in the main process, where the screen cannot reach it.
+ */
+const CLOSING_PIN = '44229910'
+const MAX_CLOSING_ATTEMPTS = 5
+const CLOSING_LOCKOUT_MS = 60_000
+const closingThrottle = { failures: 0, lockedUntil: 0 }
+
 export function registerShiftIpc(): void {
   // ---- The shop's shift: is one running, and starting the next one ----
 
@@ -69,6 +79,66 @@ export function registerShiftIpc(): void {
       return { success: true, data: startWorkShiftManually(session.userId) }
     } catch (err: any) {
       log.error('[IPC] workShift:start error:', err)
+      return { success: false, error: err.message }
+    }
+  })
+
+  /**
+   * «تقفيل» — the button at the till: end the shift now and print its slip, in one go.
+   *
+   * Open to whoever is signed in and knows the closing password (CLOSING_PIN), because
+   * the person closing up at night is usually the cashier — but a stray press, or
+   * somebody who should not end the shift, stops at the password. The shift is closed
+   * first and printed second: a printer that is out of paper must not leave the shift
+   * running — it comes back as a reprint to offer, with the shift already safely closed.
+   *
+   * With no shift running (it ended at its configured time) nothing is closed and the
+   * last shift's slip is printed.
+   */
+  handle('workShift:closeAndPrint', async (_e, { pin } = {}): Promise<IpcResponse> => {
+    try {
+      const session = requireAnyAuth()
+
+      const wait = closingThrottle.lockedUntil - Date.now()
+      if (wait > 0) {
+        return { success: false, error: `محاولات كثيرة — حاول بعد ${Math.ceil(wait / 1000)} ثانية` }
+      }
+      if (String(pin ?? '') !== CLOSING_PIN) {
+        if (++closingThrottle.failures >= MAX_CLOSING_ATTEMPTS) {
+          closingThrottle.failures = 0
+          closingThrottle.lockedUntil = Date.now() + CLOSING_LOCKOUT_MS
+        }
+        log.warn(`[WorkShift] Wrong closing password from ${session.username}`)
+        return { success: false, error: 'كلمة سر التقفيل غير صحيحة' }
+      }
+      closingThrottle.failures = 0
+
+      const { closed, shift } = closeWorkShiftNow()
+      if (!shift) throw new Error('لا توجد ورديات مسجلة بعد')
+
+      const report = getClosingReport({ workShiftId: shift.workShiftId })
+      let printed = false
+      let printError: string | null = null
+      let printerName: string | null = null
+      try {
+        const result = await printClosingReport(report, { printedBy: session.fullName })
+        printed = result.ok
+        printerName = result.printerName
+        if (!result.ok) printError = result.error || 'تعذرت الطباعة'
+      } catch (err: any) {
+        printError = err?.message || 'تعذرت الطباعة'
+      }
+
+      return {
+        success: true,
+        data: {
+          closed, shift, printed, printError, printerName,
+          revenue: report.revenue, orderCount: report.orderCount,
+          outgoings: report.outgoingsTotal, expectedCash: report.expectedCash,
+        },
+      }
+    } catch (err: any) {
+      log.error('[IPC] workShift:closeAndPrint error:', err)
       return { success: false, error: err.message }
     }
   })

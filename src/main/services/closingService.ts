@@ -102,6 +102,7 @@ export function getClosingReport(
     to,
     startTime: clock(window.start),
     endTime: clock(window.scheduledEnd),
+    endsAt: stamp(window.scheduledEnd),
     isOpen: now.getTime() < window.scheduledEnd.getTime(),
 
     orderCount: m.orderCount,

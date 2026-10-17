@@ -421,6 +421,11 @@ input, textarea, select {
   flex-direction: column;
 }
 
+/* While there is no shift, its strip lies across the top of the window (WorkShiftGate):
+   everything moves down by its height rather than hiding under it. */
+body.shift-strip .main-content { padding-top: calc(20px + var(--shift-strip-h, 44px)); }
+body.shift-strip .sidebar { padding-top: var(--shift-strip-h, 44px); }
+
 /* ===== POS SCREEN — FAST FOOD TOUCHSCREEN LAYOUT ===== */
 .pos-container {
   display: grid;

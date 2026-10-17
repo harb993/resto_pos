@@ -312,7 +312,9 @@ export default function POSScreen() {
   const changeDue = cart.getChange(taxRate)
 
   // Offer only the preset percentages the current user is actually allowed to apply.
-  const discountOptions = [0, 5, 10, 15, 20].filter((p) => p <= discountLimit)
+  // 30% is the owner's alone — a cashier never sees it, whatever their cap.
+  const discountOptions = [0, 5, 10, 15, 20, ...(user?.role === 'owner' ? [30] : [])]
+    .filter((p) => p <= discountLimit)
 
   const showToast = (msg: string, type = 'success') => {
     setToast({ msg, type })

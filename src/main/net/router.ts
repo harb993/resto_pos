@@ -42,6 +42,9 @@ function licenseBlocks(channel: string): boolean {
 /** Every channel the app knows how to serve, so the master can invoke them for a node. */
 const handlers = new Map<string, IpcHandler>()
 
+/** The channels registered with handleLocal — about the machine they run on, and only it. */
+const localChannels = new Set<string>()
+
 /**
  * Set on a node till. When present, `handle()` sends the call down the wire instead
  * of running it — or answers it from the read-only mirror when the master is away.
@@ -95,6 +98,7 @@ export function handle(channel: string, listener: IpcHandler): void {
  */
 export function handleLocal(channel: string, listener: IpcHandler): void {
   handlers.set(channel, listener)
+  localChannels.add(channel)
   ipcMain.handle(channel, (event, payload) => {
     if (licenseBlocks(channel)) return { success: false, error: LICENSE_ERROR }
     return listener(event, payload)
@@ -116,6 +120,15 @@ export async function invokeLocal(channel: string, payload: unknown): Promise<Ip
     return { success: false, error: `قناة غير معروفة: ${channel}` }
   }
   return listener(null, payload)
+}
+
+/**
+ * A node's own screens never send these down the wire — they run on the node. So one
+ * arriving at the master from a till is not something any screen did, and running it
+ * would drive the master's own hardware: its network mode, its WhatsApp window.
+ */
+export function isLocalChannel(channel: string): boolean {
+  return localChannels.has(channel)
 }
 
 export function knownChannels(): string[] {

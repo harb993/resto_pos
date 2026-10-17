@@ -1,23 +1,15 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import type { Customer } from '../../../shared/types'
 
-/* ─────────────────────────── helpers ─────────────────────────── */
-
-/** Egyptian number → WhatsApp international format (no +, no spaces). */
-function toWhatsAppNumber(raw: string): string {
-  const digits = raw.replace(/\D/g, '')
-  // Already has country code
-  if (digits.startsWith('20') && digits.length >= 11) return digits
-  // Local format 01x → 201x
-  if (digits.startsWith('0') && digits.length === 11) return '2' + digits
-  return digits
-}
-
-function buildWaLink(phone: string, message: string): string {
-  const num = toWhatsAppNumber(phone)
-  const encoded = encodeURIComponent(message)
-  return `https://wa.me/${num}?text=${encoded}`
-}
+/**
+ * واتساب تسويق — choose who, write it once, press once.
+ *
+ * The sending itself happens in the main process (whatsappSender): one WhatsApp
+ * window, each customer's chat in turn, the message and picture sent without anybody
+ * pressing anything. This screen picks the audience, writes the message, and shows
+ * the campaign going: who has had it, who could not be reached, how long is left.
+ * The till can be used while it runs — and leaving this screen does not stop it.
+ */
 
 type Segment = 'all' | 'repeat' | 'inactive' | 'top'
 type Tab = 'campaign' | 'feedback'
@@ -30,19 +22,37 @@ interface Note {
   creator_name?: string
 }
 
+/** What the main process reports as a campaign goes — see whatsappSender. */
+interface CampaignProgress {
+  state: 'idle' | 'sending' | 'waiting-login' | 'finished' | 'stopped' | 'error'
+  total: number
+  done: number
+  sent: number
+  failed: number
+  current: { phone: string; name: string | null } | null
+  /** `permanent`: not on WhatsApp — a retry would not change it. */
+  failures: { phone: string; name: string | null; reason: string; permanent: boolean }[]
+  withPicture: boolean
+  startedAt: number | null
+  finishedAt: number | null
+  secondsEach: number
+  message: string | null
+  /** How many customers of this campaign a retry would still reach. */
+  again: number
+}
+
+const WA_GREEN = '#25D366'
+const WA_DARK = '#128C7E'
+
 /* ─────────────────────── sub-components ──────────────────────── */
 
-function StatBubble({ value, label, color }: { value: string | number; label: string; color: string }) {
-  return (
-    <div style={{
-      flex: 1, minWidth: 120,
-      background: 'var(--bg-card)', border: `2px solid color-mix(in srgb, ${color} 13%, transparent)`,
-      borderTop: `3px solid ${color}`, borderRadius: 10, padding: '12px 16px',
-    }}>
-      <div style={{ fontSize: 22, fontWeight: 900, color }}>{value}</div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>{label}</div>
-    </div>
-  )
+/** "about 7 minutes" — a running campaign's time left, rounded to something sayable. */
+function minutesLeft(seconds: number): string {
+  if (seconds < 45) return 'أقل من دقيقة'
+  const m = Math.round(seconds / 60)
+  if (m <= 1) return 'حوالي دقيقة'
+  if (m === 2) return 'حوالي دقيقتين'
+  return `حوالي ${m} دقائق`
 }
 
 /* ─────────────────────── main component ──────────────────────── */
@@ -64,15 +74,13 @@ export default function WhatsappCampaignScreen() {
 
   /* ── composer ── */
   const [message, setMessage] = useState(
-    'مرحباً 👋\nنتمنى تكون بخير!\nعندنا عروض مميزة جداً النهارده — تعالى وشوف 🍗🔥'
+    'مرحباً {الاسم} 👋\nنتمنى تكون بخير!\nعندنا عروض مميزة جداً النهارده — تعالى وشوف 🍗🔥'
   )
-  const [imageNote, setImageNote] = useState('')
-  const imageInputRef = useRef<HTMLInputElement>(null)
-  const [imageFileName, setImageFileName] = useState('')
+  const [picture, setPicture] = useState<{ name: string; preview: string } | null>(null)
+  const [error, setError] = useState('')
 
-  /* ── send progress ── */
-  const [sending, setSending] = useState(false)
-  const [sendIdx, setSendIdx] = useState(0)
+  /* ── the campaign, as the main process reports it ── */
+  const [progress, setProgress] = useState<CampaignProgress | null>(null)
 
   /* ── feedback tab ── */
   const [notePhone, setNotePhone] = useState<string | null>(null)
@@ -84,12 +92,21 @@ export default function WhatsappCampaignScreen() {
   /* ─────── load customers ─────── */
   const load = useCallback(async () => {
     setLoading(true)
-    const res = await window.api.listCustomers({})
+    const res = await window.api.listCustomers({ limit: 100000 })
     if (res.success) setCustomers(res.data)
     setLoading(false)
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // A campaign started earlier is still going — or just finished — when the screen
+  // is opened again; pick it up rather than show an empty form.
+  useEffect(() => {
+    window.api.whatsappCampaignStatus().then((res: any) => {
+      if (res?.success && res.data.state !== 'idle') setProgress(res.data)
+    })
+    return window.api.onWhatsappProgress((p: CampaignProgress) => setProgress(p))
+  }, [])
 
   /* ─────── filtered audience ─────── */
   const now = Date.now()
@@ -127,64 +144,51 @@ export default function WhatsappCampaignScreen() {
     })
   }
 
-  /* ─────── image picker ─────── */
-  const pickImage = () => imageInputRef.current?.click()
-  const onImagePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setImageFileName(file.name)
-      setImageNote(`[صورة: ${file.name}]`)
-    }
+  /* ─────── picture ─────── */
+  const pickPicture = async () => {
+    const res = await window.api.whatsappPickImage()
+    if (!res.success) { setError(res.error || 'تعذر فتح الصورة'); return }
+    if (res.data) { setPicture(res.data); setError('') }
+  }
+  const removePicture = async () => {
+    await window.api.whatsappClearImage()
+    setPicture(null)
   }
 
-  /* ─────── send campaign ─────── */
+  /* ─────── send ─────── */
   const targets = audience.filter(c => selected.has(c.phone))
+  const running = progress?.state === 'sending' || progress?.state === 'waiting-login'
 
-  /*
-    One WhatsApp window, one customer at a time.
-
-    This used to open a link per customer on a timer, and every link was a new browser
-    tab — fifty customers, fifty tabs. Now each chat loads into the SAME window, and
-    the list only moves on when «التالي» is pressed, because the window has to stay on
-    a customer until their message has actually been sent.
-
-    The list is frozen when the run starts, so ticking a box half-way through cannot
-    shift who "customer 12" is.
-  */
-  const [run, setRun] = useState<Customer[]>([])
-  const [sendError, setSendError] = useState('')
-
-  const openChat = async (customer: Customer) => {
-    const fullMessage = imageFileName ? `${message}\n\n${imageNote}` : message
-    const res = await window.api.openWhatsappChat(customer.phone, fullMessage)
-    setSendError(res.success ? '' : (res.error || 'تعذر فتح واتساب'))
+  const start = async (list: { phone: string; name?: string | null }[]) => {
+    if (!list.length || (!message.trim() && !picture)) return
+    const minutes = Math.max(1, Math.round((list.length * 12) / 60))
+    if (!confirm(
+      `سيتم إرسال الرسالة${picture ? ' والصورة' : ''} إلى ${list.length} عميل تلقائياً — حوالي ${minutes} دقيقة.\n` +
+      `يمكنك استخدام البرنامج أثناء الإرسال.` +
+      // WhatsApp restricts numbers that message a great many people at once.
+      (list.length > 250 ? `\n\nتنبيه: الإرسال لعدد كبير مرة واحدة قد يجعل واتساب يقيّد رقم المحل — الأفضل تقسيمهم على أكثر من يوم.` : '') +
+      `\n\nابدأ؟`,
+    )) return
+    setError('')
+    const res = await window.api.whatsappCampaignStart(list, message, !!picture)
+    if (!res.success) setError(res.error || 'تعذر بدء الإرسال')
   }
 
-  const startSending = async () => {
-    if (!targets.length || !message.trim()) return
-    setRun(targets)
-    setSending(true)
-    setSendIdx(0)
-    await openChat(targets[0])
-  }
+  const startAll = () => start(targets.map(c => ({ phone: c.phone, name: c.name })))
 
-  /** On to the next customer in the same window — or finished. */
-  const nextCustomer = async () => {
-    const next = sendIdx + 1
-    if (next >= run.length) {
-      setSendIdx(run.length)
-      setSending(false)
-      return
-    }
-    setSendIdx(next)
-    await openChat(run[next])
+  // The same message and picture, to whoever the last campaign has not reached yet —
+  // after a stop, a dropped connection, or a few that failed.
+  const again = async () => {
+    const n = progress?.again ?? 0
+    if (!n) return
+    const minutes = Math.max(1, Math.round((n * 12) / 60))
+    if (!confirm(`سيتم إرسال نفس الرسالة إلى ${n} عميل لم تصلهم بعد — حوالي ${minutes} دقيقة. ابدأ؟`)) return
+    setError('')
+    const res = await window.api.whatsappCampaignAgain()
+    if (!res.success) setError(res.error || 'تعذر بدء الإرسال')
   }
-
-  const stopSending = () => {
-    setSending(false)
-    setSendIdx(0)
-    setRun([])
-  }
+  const stop = () => window.api.whatsappCampaignStop()
+  const showWhatsapp = () => window.api.whatsappShowWindow()
 
   /* ─────── feedback / notes ─────── */
   const openNotes = async (phone: string) => {
@@ -210,10 +214,6 @@ export default function WhatsappCampaignScreen() {
     setNotes(prev => prev.filter(n => n.note_id !== noteId))
   }
 
-  /* ─────── stats ─────── */
-  const totalCustomers = customers.length
-  const repeatCustomers = customers.filter(c => c.order_count > 1).length
-
   /* ─────── render ─────── */
   return (
     <div className="animate-fade" dir="rtl" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -224,17 +224,9 @@ export default function WhatsappCampaignScreen() {
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 28 }}>💬</span> واتساب تسويق
           </h1>
-          <p className="page-subtitle">أرسل عروض وصور الوجبات لعملائك مباشرة عبر واتساب — بدون اشتراك أو API</p>
+          <p className="page-subtitle">اكتب الرسالة مرة واحدة واضغط إرسال — تصل لكل العملاء المحددين تلقائياً</p>
         </div>
         <button className="btn btn-secondary" onClick={load} disabled={loading}>🔄 تحديث</button>
-      </div>
-
-      {/* ── Stats bar ── */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-        <StatBubble value={totalCustomers} label="إجمالي العملاء" color="#25D366" />
-        <StatBubble value={repeatCustomers} label="عملاء متكررون" color="#128C7E" />
-        <StatBubble value={audience.length} label="الجمهور المحدد" color="#075E54" />
-        <StatBubble value={selected.size} label="سيُرسل لهم" color="var(--accent)" />
       </div>
 
       {/* ── Tab bar ── */}
@@ -245,9 +237,9 @@ export default function WhatsappCampaignScreen() {
             onClick={() => setTab(id)}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
-              padding: '10px 22px', fontSize: 14, fontWeight: 700,
-              color: tab === id ? '#25D366' : 'var(--text-secondary)',
-              borderBottom: tab === id ? '3px solid #25D366' : '3px solid transparent',
+              padding: '10px 22px', fontSize: 14, fontWeight: 700, fontFamily: 'inherit',
+              color: tab === id ? WA_GREEN : 'var(--text-secondary)',
+              borderBottom: tab === id ? `3px solid ${WA_GREEN}` : '3px solid transparent',
               marginBottom: -2, transition: 'all 0.2s',
             }}
           >{label}</button>
@@ -270,22 +262,19 @@ export default function WhatsappCampaignScreen() {
           toggleAll={toggleAll}
           message={message}
           setMessage={setMessage}
-          imageFileName={imageFileName}
-          imageNote={imageNote}
-          pickImage={pickImage}
-          imageInputRef={imageInputRef}
-          onImagePicked={onImagePicked}
-          targets={sending || run.length > 0 ? run : targets}
-          liveTargets={targets}
-          nextCustomer={nextCustomer}
-          stopSending={stopSending}
-          reopenChat={() => run[sendIdx] && openChat(run[sendIdx])}
-          sendError={sendError}
-          sending={sending}
-          sendIdx={sendIdx}
-          setSendIdx={(n: number) => { setSendIdx(n); if (n === 0) setRun([]) }}
-          startSending={startSending}
+          picture={picture}
+          pickPicture={pickPicture}
+          removePicture={removePicture}
+          targets={targets}
           loading={loading}
+          progress={progress}
+          running={running}
+          error={error}
+          startAll={startAll}
+          again={again}
+          stop={stop}
+          showWhatsapp={showWhatsapp}
+          dismiss={() => setProgress(null)}
         />
       ) : (
         <FeedbackTab
@@ -303,15 +292,6 @@ export default function WhatsappCampaignScreen() {
           setNotePhone={setNotePhone}
         />
       )}
-
-      {/* hidden file input */}
-      <input
-        ref={imageInputRef}
-        type="file"
-        accept="image/*"
-        style={{ display: 'none' }}
-        onChange={onImagePicked}
-      />
     </div>
   )
 }
@@ -324,9 +304,9 @@ function CampaignTab({
   search, setSearch,
   toggle, toggleAll,
   message, setMessage,
-  imageFileName, imageNote, pickImage, imageInputRef, onImagePicked,
-  targets, liveTargets, sending, sendIdx, setSendIdx, startSending, loading,
-  nextCustomer, stopSending, reopenChat, sendError,
+  picture, pickPicture, removePicture,
+  targets, loading, progress, running, error,
+  startAll, again, stop, showWhatsapp, dismiss,
 }: any) {
   const SEGMENTS: [Segment, string, string][] = [
     ['all', 'كل العملاء', '🌍'],
@@ -335,12 +315,14 @@ function CampaignTab({
     ['top', 'أعلى إنفاقاً', '🏆'],
   ]
 
-  const sendProgress = targets.length > 0 ? Math.round((sendIdx / targets.length) * 100) : 0
+  // The preview shows the message as the first customer will get it.
+  const sample = (targets[0]?.name as string | undefined)?.trim() || 'أحمد'
+  const previewText = String(message).replace(/\{\s*الاسم\s*\}/g, sample)
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: 20, flex: 1, minHeight: 0 }}>
 
-      {/* ── LEFT: Audience ── */}
+      {/* ── Audience ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
 
         {/* Segment selector */}
@@ -350,7 +332,7 @@ function CampaignTab({
               key={id}
               onClick={() => setSegment(id)}
               className={segment === id ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
-              style={segment === id ? { background: '#25D366', border: 'none' } : {}}
+              style={segment === id ? { background: WA_GREEN, border: 'none' } : {}}
             >{icon} {label}</button>
           ))}
         </div>
@@ -386,6 +368,9 @@ function CampaignTab({
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
+        <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: -6 }}>
+          👥 {audience.length} عميل في القائمة — <b style={{ color: WA_DARK }}>{selected.size}</b> محدد للإرسال
+        </div>
 
         {/* Customer list */}
         <div className="table-container" style={{ flex: 1, overflowY: 'auto' }}>
@@ -413,13 +398,13 @@ function CampaignTab({
                 </td></tr>
               )}
               {audience.map((c: Customer) => (
-                <tr key={c.phone} style={selected.has(c.phone) ? { background: '#25D36610' } : {}}>
+                <tr key={c.phone} style={selected.has(c.phone) ? { background: `color-mix(in srgb, ${WA_GREEN} 7%, transparent)` } : {}}>
                   <td>
                     <input type="checkbox"
                       checked={selected.has(c.phone)}
                       onChange={() => toggle(c.phone)} />
                   </td>
-                  <td style={{ fontFamily: 'monospace', fontWeight: 800, color: '#25D366' }}>{c.phone}</td>
+                  <td style={{ fontFamily: 'monospace', fontWeight: 800, color: WA_DARK }}>{c.phone}</td>
                   <td style={{ fontWeight: 700 }}>{c.name || '—'}</td>
                   <td>
                     <span className={`badge ${c.order_count > 1 ? 'badge-success' : 'badge-warning'}`}>
@@ -436,151 +421,219 @@ function CampaignTab({
         </div>
       </div>
 
-      {/* ── RIGHT: Composer + Send ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* ── Composer + Send ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', minHeight: 0 }}>
 
-        {/* WhatsApp brand strip */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          background: 'linear-gradient(135deg, #25D366, #128C7E)',
-          borderRadius: 12, padding: '14px 18px', color: '#fff',
-        }}>
-          <span style={{ fontSize: 28 }}>💬</span>
-          <div>
-            <div style={{ fontWeight: 900, fontSize: 15 }}>واتساب تسويق</div>
-            <div style={{ fontSize: 11, opacity: 0.85 }}>نافذة واحدة لكل العملاء — الرسالة تُكتب تلقائياً</div>
-          </div>
-        </div>
-
-        {/* Message composer */}
-        <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-secondary)' }}>✏️ نص الرسالة</div>
-
-          {/* Quick emoji bar */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {['🍗', '🔥', '🎉', '⭐', '💰', '🆓', '👋', '❤️', '✅', '📞'].map(e => (
-              <button key={e}
-                style={{ fontSize: 18, background: 'var(--bg-card-hover)', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 6px', cursor: 'pointer' }}
-                onClick={() => setMessage((m: string) => m + e)}
-              >{e}</button>
-            ))}
-          </div>
-
-          <textarea
-            value={message}
-            onChange={e => setMessage(e.target.value)}
-            style={{
-              width: '100%', minHeight: 140, resize: 'vertical',
-              background: 'var(--bg-card-hover)', border: '1px solid var(--border)',
-              borderRadius: 8, padding: 12, fontSize: 14, color: 'var(--text-primary)',
-              fontFamily: 'inherit', direction: 'rtl', lineHeight: 1.6,
-            }}
-            placeholder="اكتب رسالتك هنا..."
+        {progress && progress.state !== 'idle' ? (
+          <CampaignPanel
+            progress={progress} running={running} error={error}
+            stop={stop} again={again} showWhatsapp={showWhatsapp} dismiss={dismiss}
           />
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'left' }}>
-            {message.length} حرف
-          </div>
-
-          {/* Image attach */}
-          <button className="btn btn-secondary btn-sm" onClick={pickImage} style={{ alignSelf: 'flex-start' }}>
-            🖼️ {imageFileName ? `تم اختيار: ${imageFileName}` : 'إرفاق صورة (اختياري)'}
-          </button>
-          {imageFileName && (
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', background: 'var(--bg-card-hover)', borderRadius: 8, padding: '8px 12px' }}>
-              💡 ستُرسل عبر رسالة منفصلة في واتساب — جهّز الصورة قبل الضغط على إرسال.
-            </div>
-          )}
-        </div>
-
-        {/* WhatsApp preview bubble */}
-        <div className="card" style={{ padding: 16 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-secondary)', marginBottom: 10 }}>👁️ معاينة</div>
-          <div style={{
-            background: '#DCF8C6', borderRadius: '0 12px 12px 12px',
-            padding: '12px 14px', maxWidth: 280, fontSize: 14,
-            color: '#111', whiteSpace: 'pre-wrap', direction: 'rtl',
-            boxShadow: '0 1px 3px #0001',
-          }}>
-            {message || '...'}
-            {imageFileName && (
-              <div style={{ marginTop: 8, padding: '6px 10px', background: '#25D36620', borderRadius: 6, fontSize: 12, color: '#075E54' }}>
-                🖼️ {imageFileName}
-              </div>
-            )}
-            <div style={{ fontSize: 10, color: '#667', textAlign: 'left', marginTop: 6 }}>
-              {new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })} ✓✓
-            </div>
-          </div>
-        </div>
-
-        {/* Send button + progress */}
-        {sending ? (
-          <div className="card" style={{ padding: 18, textAlign: 'center' }}>
-            <div style={{ fontWeight: 700, marginBottom: 10, color: '#25D366' }}>
-              العميل {sendIdx + 1} من {targets.length}
-            </div>
-            <div style={{ height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
-              <div style={{
-                height: '100%', background: '#25D366', borderRadius: 4,
-                width: `${sendProgress}%`, transition: 'width 0.5s',
-              }} />
-            </div>
-            <div style={{ fontSize: 15, fontWeight: 800, marginTop: 10 }}>
-              {targets[sendIdx]?.name || 'عميل'}{' '}
-              <span style={{ fontFamily: 'monospace', color: '#25D366' }}>{targets[sendIdx]?.phone || ''}</span>
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.7 }}>
-              الرسالة مكتوبة في نافذة واتساب — اضغط «إرسال» هناك، ثم «التالي» هنا.
-            </div>
-            {sendError && (
-              <div className="badge badge-danger" style={{ marginTop: 8, padding: '6px 10px' }}>⚠️ {sendError}</div>
-            )}
-            <button
-              className="btn btn-primary"
-              onClick={nextCustomer}
-              style={{ width: '100%', marginTop: 12, background: '#25D366', border: 'none', fontWeight: 900, padding: '12px 0' }}
-            >
-              {sendIdx + 1 < targets.length ? 'التالي ⬅' : '✅ إنهاء'}
-            </button>
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <button className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={reopenChat}>🔁 افتح المحادثة مرة أخرى</button>
-              <button className="btn btn-ghost btn-sm" style={{ flex: 1, color: 'var(--danger)' }} onClick={stopSending}>⏹ إيقاف</button>
-            </div>
-          </div>
-        ) : sendIdx > 0 && sendIdx === targets.length ? (
-          <div className="card" style={{ padding: 18, textAlign: 'center', borderTop: '3px solid #25D366' }}>
-            <div style={{ fontSize: 24, marginBottom: 6 }}>✅</div>
-            <div style={{ fontWeight: 700, color: '#25D366' }}>اكتمل الإرسال!</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-              تم المرور على {targets.length} عميل في نافذة واتساب واحدة
-            </div>
-            <button className="btn btn-secondary btn-sm" style={{ marginTop: 12 }}
-              onClick={() => setSendIdx(0)}>
-              إرسال مرة أخرى
-            </button>
-          </div>
         ) : (
-          <button
-            className="btn btn-primary"
-            disabled={liveTargets.length === 0 || !message.trim()}
-            onClick={startSending}
-            style={{
-              background: liveTargets.length > 0 && message.trim()
-                ? 'linear-gradient(135deg, #25D366, #128C7E)'
-                : undefined,
-              border: 'none', fontSize: 15, padding: '14px 0',
-              borderRadius: 12, fontWeight: 900, letterSpacing: 0.5,
-            }}
-          >
-            🚀 ابدأ الإرسال لـ {liveTargets.length} عميل
-          </button>
-        )}
+          <>
+            {/* Message composer */}
+            <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontWeight: 800, fontSize: 14 }}>✏️ الرسالة</div>
 
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.5 }}>
-          تُفتح نافذة واتساب واحدة لكل العملاء (تسجيل الدخول مرة واحدة) —<br />
-          اضغط «إرسال» في واتساب ثم «التالي» هنا لكل عميل
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                <button
+                  className="btn btn-sm btn-secondary"
+                  title="يُكتب مكانه اسم كل عميل"
+                  onClick={() => setMessage((m: string) => m + '{الاسم}')}
+                >
+                  + اسم العميل
+                </button>
+                {['🍗', '🔥', '🎉', '⭐', '💰', '🆓', '👋', '❤️', '✅', '📞'].map(e => (
+                  <button key={e}
+                    style={{ fontSize: 18, background: 'var(--bg-card-hover)', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 6px', cursor: 'pointer' }}
+                    onClick={() => setMessage((m: string) => m + e)}
+                  >{e}</button>
+                ))}
+              </div>
+
+              <textarea
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                style={{
+                  width: '100%', minHeight: 110, resize: 'vertical',
+                  background: 'var(--bg-input)', border: '1px solid var(--border)',
+                  borderRadius: 8, padding: 12, fontSize: 14, color: 'var(--text-primary)',
+                  fontFamily: 'inherit', direction: 'rtl', lineHeight: 1.6,
+                }}
+                placeholder="اكتب رسالتك هنا..."
+              />
+              <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                <b>{'{الاسم}'}</b> يُكتب مكانه اسم كل عميل · {String(message).length} حرف
+              </div>
+
+              {/* Picture */}
+              {picture ? (
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', background: 'var(--bg-card-hover)', borderRadius: 8, padding: 8 }}>
+                  <img src={picture.preview} alt="" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6 }} />
+                  <div style={{ flex: 1, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    🖼️ {picture.name}
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>تُرسل مع الرسالة لكل عميل</div>
+                  </div>
+                  <button className="btn btn-sm btn-ghost" style={{ color: 'var(--danger)' }} onClick={removePicture}>✕</button>
+                </div>
+              ) : (
+                <button className="btn btn-secondary btn-sm" onClick={pickPicture} style={{ alignSelf: 'flex-start' }}>
+                  🖼️ إضافة صورة (اختياري)
+                </button>
+              )}
+            </div>
+
+            {/* WhatsApp preview bubble */}
+            <div className="card" style={{ padding: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 8 }}>👁️ كما ستصل للعميل</div>
+              <div style={{
+                background: '#DCF8C6', borderRadius: '0 12px 12px 12px',
+                padding: picture ? 6 : '10px 12px', maxWidth: 280, fontSize: 14,
+                color: '#111', whiteSpace: 'pre-wrap', direction: 'rtl',
+                boxShadow: '0 1px 3px #0001',
+              }}>
+                {picture && <img src={picture.preview} alt="" style={{ width: '100%', borderRadius: 8, display: 'block', marginBottom: 6 }} />}
+                <div style={{ padding: picture ? '0 6px 4px' : 0 }}>{previewText || '...'}</div>
+              </div>
+            </div>
+
+            {/* Pinned to the foot of the column, so it is on screen however long the
+                message gets. */}
+            <div style={{
+              position: 'sticky', bottom: 0, background: 'var(--bg-app)',
+              display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 6, marginTop: 'auto',
+            }}>
+              {error && (
+                <div className="badge badge-danger" style={{ display: 'block', padding: '9px 12px', whiteSpace: 'normal' }}>⚠️ {error}</div>
+              )}
+
+              <button
+                className="btn btn-primary"
+                disabled={targets.length === 0 || (!String(message).trim() && !picture)}
+                onClick={startAll}
+                style={{
+                  background: targets.length > 0 ? `linear-gradient(135deg, ${WA_GREEN}, ${WA_DARK})` : undefined,
+                  border: 'none', fontSize: 16, padding: '14px 0',
+                  borderRadius: 12, fontWeight: 900,
+                }}
+              >
+                🚀 إرسال للكل ({targets.length} عميل)
+              </button>
+
+              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.7 }}>
+                يُرسل تلقائياً في الخلفية، عميل بعد عميل (حوالي 10 ثوانٍ لكل عميل) —
+                <br />تقدر تستخدم البرنامج عادي أثناء الإرسال. أول مرة فقط: امسح كود واتساب من موبايل المحل.
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** The campaign going — or how it went. */
+function CampaignPanel({ progress: p, running, error, stop, again, showWhatsapp, dismiss }: {
+  progress: CampaignProgress
+  running: boolean
+  error: string
+  stop: () => void
+  again: () => void
+  showWhatsapp: () => void
+  dismiss: () => void
+}) {
+  const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0
+  const remaining = Math.max(0, p.total - p.done)
+  const eta = p.secondsEach > 0 ? minutesLeft(remaining * p.secondsEach) : null
+
+  return (
+    <div className="card" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12, borderTop: `3px solid ${WA_GREEN}` }}>
+      {p.state === 'waiting-login' ? (
+        <div style={{ textAlign: 'center', lineHeight: 1.9 }}>
+          <div style={{ fontSize: 34 }}>📱</div>
+          <b>امسح كود واتساب من موبايل المحل</b>
+          <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
+            في الموبايل: واتساب ← الأجهزة المرتبطة ← ربط جهاز. مرة واحدة فقط — ثم يكمل الإرسال وحده.
+          </div>
+          <button className="btn btn-secondary btn-sm" style={{ marginTop: 8 }} onClick={showWhatsapp}>📱 إظهار كود واتساب</button>
+        </div>
+      ) : running ? (
+        <div style={{ fontWeight: 800, color: WA_DARK, textAlign: 'center' }}>
+          ⏳ جاري الإرسال… {p.done} من {p.total}
+        </div>
+      ) : (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 30 }}>{p.state === 'finished' ? '✅' : p.state === 'stopped' ? '⏹' : '⚠️'}</div>
+          <div style={{ fontWeight: 900, fontSize: 16 }}>
+            {p.state === 'finished' ? 'تم الإرسال' : p.state === 'stopped' ? 'تم إيقاف الإرسال' : 'توقف الإرسال بسبب خطأ'}
+          </div>
+          {p.message && <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 4 }}>{p.message}</div>}
+        </div>
+      )}
+
+      <div style={{ height: 10, background: 'var(--border)', borderRadius: 5, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: WA_GREEN, borderRadius: 5, transition: 'width 0.6s' }} />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, textAlign: 'center' }}>
+        <div style={{ background: 'var(--success-bg)', borderRadius: 8, padding: 8 }}>
+          <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--success)' }}>{p.sent}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>وصلت</div>
+        </div>
+        <div style={{ background: 'var(--danger-bg)', borderRadius: 8, padding: 8 }}>
+          <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--danger)' }}>{p.failed}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>لم تصل</div>
+        </div>
+        <div style={{ background: 'var(--bg-card-hover)', borderRadius: 8, padding: 8 }}>
+          <div style={{ fontSize: 20, fontWeight: 900 }}>{remaining}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>متبقي</div>
         </div>
       </div>
+
+      {running && p.current && (
+        <div style={{ fontSize: 13, textAlign: 'center' }}>
+          الآن: <b>{p.current.name || 'عميل'}</b>{' '}
+          <span style={{ fontFamily: 'monospace', color: WA_DARK }}>{p.current.phone}</span>
+          {eta && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>الوقت المتبقي: {eta}</div>}
+        </div>
+      )}
+
+      {p.failures.length > 0 && (
+        <div style={{ maxHeight: 180, overflowY: 'auto', fontSize: 12, background: 'var(--bg-card-hover)', borderRadius: 8, padding: '6px 10px' }}>
+          {p.failures.map((f, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '3px 0', borderBottom: '1px solid var(--border)' }}>
+              <span>{f.name || '—'} <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)' }}>{f.phone}</span></span>
+              <span style={{ color: f.permanent ? 'var(--text-muted)' : 'var(--danger)' }}>{f.reason}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {error && (
+        <div className="badge badge-danger" style={{ display: 'block', padding: '9px 12px', whiteSpace: 'normal' }}>⚠️ {error}</div>
+      )}
+
+      {running ? (
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-secondary" style={{ flex: 1, color: 'var(--danger)' }} onClick={stop}>⏹ إيقاف الإرسال</button>
+          <button className="btn btn-secondary" style={{ flex: 1 }} onClick={showWhatsapp}>👁️ عرض واتساب</button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {p.again > 0 && (
+            <button className="btn btn-primary" style={{ flex: '1 1 100%', background: WA_GREEN, border: 'none' }} onClick={again}>
+              🔁 إعادة المحاولة لمن لم تصلهم ({p.again})
+            </button>
+          )}
+          <button className="btn btn-secondary" style={{ flex: 1 }} onClick={dismiss}>✏️ حملة جديدة</button>
+        </div>
+      )}
+
+      {running && (
+        <div style={{ fontSize: 11.5, color: 'var(--text-muted)', textAlign: 'center' }}>
+          يمكنك استخدام البرنامج أو الخروج من هذه الشاشة — الإرسال مستمر في الخلفية.
+        </div>
+      )}
     </div>
   )
 }
@@ -734,9 +787,4 @@ function FeedbackTab({
       </div>
     </div>
   )
-}
-
-/* ─────── helpers ─────── */
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms))
 }

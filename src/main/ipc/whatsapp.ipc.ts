@@ -1,85 +1,103 @@
-import { app, BrowserWindow, shell } from 'electron'
-import log from 'electron-log/main'
+import { BrowserWindow } from 'electron'
 import { handle, handleLocal } from '../net/router'
 import * as whatsapp from '../services/whatsappService'
+import * as sender from '../services/whatsappSender'
 import { requireOwnerOrAccountant, getCurrentSession } from '../services/authService'
 import type { IpcResponse } from '../../shared/types'
 
 /**
- * ONE WhatsApp window for the whole campaign.
+ * WhatsApp marketing: one window, and a campaign that sends itself — see
+ * whatsappSender for how and why.
  *
- * A campaign used to open a `wa.me` link per customer, and every link became a new
- * browser tab: fifty customers, fifty tabs, each one loading WhatsApp Web from scratch
- * and each one needing to be found again to press send. Now there is a single window,
- * signed in once (the session is kept between runs), and each customer's chat is
- * loaded into that same window in turn.
- *
- * The message is typed in for you; pressing send stays with the person at the screen.
+ * Every channel here is LOCAL, always: the WhatsApp window, the picture file and the
+ * campaign all belong to the machine the person is sitting at, not to the master.
  */
-let waWindow: BrowserWindow | null = null
-
-function whatsappWindow(): BrowserWindow {
-  if (waWindow && !waWindow.isDestroyed()) return waWindow
-
-  const win = new BrowserWindow({
-    width: 1100,
-    height: 780,
-    title: 'واتساب',
-    autoHideMenuBar: true,
-    webPreferences: {
-      // Its own persistent profile: the QR code is scanned once, and nothing WhatsApp
-      // stores can reach the till's own page — or the other way round.
-      partition: 'persist:whatsapp',
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
-  })
-
-  // WhatsApp Web turns away anything that does not look like a current browser, and
-  // Electron's own user agent names Electron and the app.
-  const ua = app.userAgentFallback
-    .replace(/\s(?!Mozilla|AppleWebKit|Chrome|Safari)[\w.-]+\/[\w.-]+(?=\s|$)/g, '')
-  win.webContents.setUserAgent(ua)
-
-  // A link inside a chat opens in the real browser, not in another app window.
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url)
-    return { action: 'deny' }
-  })
-
-  win.on('closed', () => { if (waWindow === win) waWindow = null })
-  waWindow = win
-  return win
-}
-
-/** Egyptian mobile → international digits, as WhatsApp wants them. */
-function whatsappNumber(raw: unknown): string {
-  const digits = String(raw ?? '').replace(/\D/g, '')
-  if (digits.startsWith('20') && digits.length >= 11) return digits
-  if (digits.startsWith('0') && digits.length === 11) return '2' + digits
-  return digits
-}
-
 export function registerWhatsappIpc(): void {
-  // Local, always: the window has to open on the machine the person is sitting at,
-  // not on the master.
+  // Progress goes to this machine's own screens — not the WhatsApp window itself, and
+  // not the other till, whose owner did not start anything.
+  sender.onCampaignProgress(progress => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (w.isDestroyed() || w === sender.whatsappWindow.peek()) continue
+      w.webContents.send('app:whatsappProgress', progress)
+    }
+  })
+
   handleLocal('whatsapp:openChat', async (_e, { phone, text } = {}): Promise<IpcResponse> => {
     try {
       requireOwnerOrAccountant()
-      const number = whatsappNumber(phone)
-      if (number.length < 8) throw new Error('رقم الهاتف غير صحيح')
-
-      const win = whatsappWindow()
-      const url = `https://web.whatsapp.com/send?phone=${number}` +
-        `&text=${encodeURIComponent(String(text ?? ''))}`
-      // Not awaited to completion: WhatsApp Web redirects while it loads, which
-      // rejects the load promise for a page that is in fact arriving.
-      win.loadURL(url).catch(err => log.debug('[WhatsApp] load:', err?.message || err))
-      if (win.isMinimized()) win.restore()
-      win.show()
-      win.focus()
+      sender.openChat(phone, text ?? '')
       return { success: true }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  handleLocal('whatsapp:pickImage', async (): Promise<IpcResponse> => {
+    try {
+      requireOwnerOrAccountant()
+      const parent = BrowserWindow.getFocusedWindow() ?? undefined
+      return { success: true, data: await sender.pickPicture(parent) }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  handleLocal('whatsapp:clearImage', async (): Promise<IpcResponse> => {
+    try {
+      requireOwnerOrAccountant()
+      sender.clearPicture()
+      return { success: true }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  handleLocal('whatsapp:campaignStart', async (_e, { recipients, text, withPicture } = {}): Promise<IpcResponse> => {
+    try {
+      requireOwnerOrAccountant()
+      return { success: true, data: { total: sender.startCampaign(recipients, text, { withPicture: !!withPicture }) } }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  // Everyone the last campaign has not reached yet — after a stop, a dropped
+  // connection, or a few that failed.
+  handleLocal('whatsapp:campaignAgain', async (): Promise<IpcResponse> => {
+    try {
+      requireOwnerOrAccountant()
+      return { success: true, data: { total: sender.campaignAgain() } }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  handleLocal('whatsapp:showWindow', async (): Promise<IpcResponse> => {
+    try {
+      requireOwnerOrAccountant()
+      sender.showWhatsappWindow()
+      return { success: true }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  handleLocal('whatsapp:campaignStop', async (): Promise<IpcResponse> => {
+    try {
+      requireOwnerOrAccountant()
+      sender.stopCampaign()
+      return { success: true }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  // The screen asks on opening, so leaving it mid-campaign and coming back shows the
+  // campaign still running rather than an empty form.
+  handleLocal('whatsapp:campaignStatus', async (): Promise<IpcResponse> => {
+    try {
+      requireOwnerOrAccountant()
+      return { success: true, data: sender.campaignProgress() }
     } catch (err: any) {
       return { success: false, error: err.message }
     }

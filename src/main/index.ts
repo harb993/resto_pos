@@ -39,6 +39,7 @@ import {
 import { broadcast } from './ipc/broadcast'
 import { cleanPrintTemp } from './services/printing/transport'
 import { closeRenderWindows } from './services/printing/render'
+import { closeWhatsappWindow } from './services/whatsappSender'
 import { endAllOpenSessions, closeSessionsPastShiftEnd, resumeSessionForUser } from './services/shiftService'
 import { tickWorkShift, getWorkShiftStatus, onWorkShiftChanged } from './services/workShiftService'
 import { getSettings } from './services/settingsService'
@@ -97,6 +98,9 @@ function createWindow(): void {
   mainWindow.on('closed', () => {
     mainWindow = null
     closeRenderWindows()
+    // The WhatsApp window too: hidden while a campaign runs, it would otherwise keep
+    // the app alive with nothing on screen.
+    closeWhatsappWindow()
   })
 
   // Recover from renderer crash
@@ -348,6 +352,11 @@ app.on('before-quit', (event) => {
       closeRenderWindows()
     } catch (err) {
       log.warn('Failed to close print render windows:', err)
+    }
+    try {
+      closeWhatsappWindow()
+    } catch (err) {
+      log.warn('Failed to close the WhatsApp window:', err)
     }
     // Let go of the LAN before the database closes: a node mid-request against a
     // master that has already shut its database would get an error rather than the

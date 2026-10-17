@@ -3,7 +3,7 @@ import { initDatabase, getDb } from '../src/main/db/db'
 import { updateSettings } from '../src/main/services/settingsService'
 import {
   tickWorkShift, getWorkShiftStatus, startWorkShiftManually, listWorkShifts,
-  requireOpenWorkShift, workShiftWindow,
+  requireOpenWorkShift, workShiftWindow, closeWorkShiftNow,
 } from '../src/main/services/workShiftService'
 import { getWorkShiftReport } from '../src/main/services/shiftReportService'
 import { getClosingReport } from '../src/main/services/closingService'
@@ -291,5 +291,52 @@ describe('invoice numbers count each shift separately', () => {
     const [second, first] = listWorkShifts()
     expect(getWorkShiftReport(first.workShiftId).invoices.map(i => i.invoiceNumber)).toEqual(['0001', '0002'])
     expect(getWorkShiftReport(second.workShiftId).invoices.map(i => i.invoiceNumber)).toEqual(['0001', '0002'])
+  })
+})
+
+describe('«تقفيل» — ending the shift by hand', () => {
+  beforeEach(() => {
+    updateSettings({ shifts_per_day: 1, shift1_start: '09:00', shift1_end: '17:50' } as never)
+  })
+
+  it('ends the running shift on the spot, and the till stops selling', () => {
+    tickWorkShift(at(12, 10))
+    const { closed, shift } = closeWorkShiftNow(at(12, 13, 0))
+    expect(closed).toBe(true)
+    expect(shift).toMatchObject({ openedAt: '2026-10-12 09:00', endsAt: '2026-10-12 13:00', isOpen: false })
+
+    const status = getWorkShiftStatus(at(12, 13, 5))
+    expect(status.open).toBeNull()
+    expect(status.next).toMatchObject({ startsAt: '2026-10-13 09:00' })
+    expect(() => requireOpenWorkShift(at(12, 13, 5))).toThrow(/لا توجد وردية مفتوحة/)
+  })
+
+  it('does not open again by itself later the same day — only at the next start time', () => {
+    tickWorkShift(at(12, 10))
+    closeWorkShiftNow(at(12, 13, 0))
+    expect(getWorkShiftStatus(at(12, 16, 0)).open).toBeNull()
+    expect(getWorkShiftStatus(at(13, 9, 0)).open).toMatchObject({ openedAt: '2026-10-13 09:00' })
+  })
+
+  it('pressed again with nothing running, it names the shift that ended so its slip can print', () => {
+    tickWorkShift(at(12, 10))
+    const first = closeWorkShiftNow(at(12, 13, 0))
+    const again = closeWorkShiftNow(at(12, 13, 2))
+    expect(again.closed).toBe(false)
+    expect(again.shift?.workShiftId).toBe(first.shift?.workShiftId)
+  })
+
+  it('the slip for a shift closed by hand covers what happened in it — and a wage paid after', () => {
+    tickWorkShift(at(12, 10))
+    order('2026-10-12 11:00:00', { subtotal: 300 })
+    const { shift } = closeWorkShiftNow(at(12, 13, 0))
+    salary('2026-10-12 13:01:00', 150) // the cashier is paid on the way out
+
+    const slip = getClosingReport({ workShiftId: shift!.workShiftId }, at(12, 13, 5))
+    expect(slip.isOpen).toBe(false)
+    expect(slip.endsAt).toBe('2026-10-12 13:00:00')
+    expect(slip.revenue).toBe(300)
+    expect(slip.salariesTotal).toBe(150)
+    expect(slip.expectedCash).toBe(150)
   })
 })

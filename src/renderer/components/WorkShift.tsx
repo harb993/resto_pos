@@ -129,11 +129,19 @@ export function WorkShiftGate() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
+  // The strip lies across the top of the window; while it is there the page moves down
+  // by its height (index.css, body.shift-strip), so it covers no screen's title or buttons.
+  const key = status?.last?.workShiftId ?? 0
+  const strip = !!status && !status.open && dismissedFor === key
+  useEffect(() => {
+    document.body.classList.toggle('shift-strip', strip)
+    return () => document.body.classList.remove('shift-strip')
+  }, [strip])
+
   if (!status || status.open) return null
 
   const last = status.last
   const next = status.next
-  const key = last?.workShiftId ?? 0
 
   const start = async () => {
     setBusy(true)
@@ -159,9 +167,9 @@ export function WorkShiftGate() {
     </>
   )
 
-  if (dismissedFor === key) {
+  if (strip) {
     return (
-      <div style={{
+      <div ref={el => { if (el) document.body.style.setProperty('--shift-strip-h', `${el.offsetHeight}px`) }} style={{
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9000,
         background: 'var(--warning, #b06a07)', color: '#fff', padding: '8px 16px',
         display: 'flex', gap: 14, alignItems: 'center', justifyContent: 'center',

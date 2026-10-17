@@ -900,6 +900,8 @@ export interface ClosingReport {
   /** The hours as configured, `HH:MM`. */
   startTime: string
   endTime: string
+  /** `YYYY-MM-DD HH:MM:SS` — when it ended (or is due to): a night shift ends the next day. */
+  endsAt: string
   /** True while the shift has not reached its configured end — figures are up to now. */
   isOpen: boolean
 
